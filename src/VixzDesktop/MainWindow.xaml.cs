@@ -185,11 +185,23 @@ namespace VixzDesktop
             } catch(e) {}
         }, 1500);
 
+        function pauseVideo() {
+            if (player && typeof player.pauseVideo === 'function') {
+                player.pauseVideo();
+            }
+        }
+
+        function playVideo() {
+            if (player && typeof player.playVideo === 'function') {
+                player.playVideo();
+            }
+        }
+
         function togglePlay() {
             if (!player || typeof player.getPlayerState !== 'function') return;
             var s = player.getPlayerState();
-            if (s === 1) player.pauseVideo();
-            else player.playVideo();
+            if (s === 1) pauseVideo();
+            else playVideo();
         }
 
         function seek(sec) {
@@ -739,6 +751,12 @@ namespace VixzDesktop
                 await VideoWebView.ExecuteScriptAsync("pauseVideo()");
             }
             catch { }
+
+            // Unload main WebView to free 100% GPU/CPU resources & prevent dual playback lag
+            if (VideoWebView.CoreWebView2 != null)
+            {
+                VideoWebView.CoreWebView2.Navigate("about:blank");
+            }
 
             _popOutWindow?.Close();
             _popOutWindow = new PopOutPlayerWindow(this, _currentVideo, curSec);
