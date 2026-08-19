@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using YoutubeExplode;
 using YoutubeExplode.Videos.Streams;
@@ -18,15 +19,27 @@ namespace VixzDesktop.Services
             }
 
             var manifest = await _client.Videos.Streams.GetManifestAsync(videoId);
-            var streamInfo = manifest.GetMuxedStreams().GetWithHighestVideoQuality();
+
+            // 1. Try muxed streams (combined audio & video)
+            IStreamInfo? streamInfo = manifest.GetMuxedStreams().GetWithHighestVideoQuality();
+
             if (streamInfo == null)
             {
-                // Fallback to highest audio-only or video-only if no muxed
+                // 2. Fallback to any muxed stream
                 streamInfo = manifest.GetMuxedStreams().FirstOrDefault();
-                if (streamInfo == null)
-                {
-                    throw new Exception("No downloadable MP4 video stream found.");
-                }
+            }
+
+            if (streamInfo == null)
+            {
+                // 3. Fallback to video-only or audio-only
+                streamInfo = (IStreamInfo?)manifest.GetVideoOnlyStreams().GetWithHighestVideoQuality() ??
+                             (IStreamInfo?)manifest.GetAudioOnlyStreams().GetWithHighestBitrate() ??
+                             manifest.Streams.FirstOrDefault();
+            }
+
+            if (streamInfo == null)
+            {
+                throw new Exception("No playable video or audio streams found for download.");
             }
 
             var downloadsFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "Vixz");
@@ -36,13 +49,16 @@ namespace VixzDesktop.Services
             if (string.IsNullOrWhiteSpace(cleanTitle)) cleanTitle = $"Video_{videoId}";
             if (cleanTitle.Length > 80) cleanTitle = cleanTitle.Substring(0, 80);
 
-            var filePath = Path.Combine(downloadsFolder, $"{cleanTitle}.mp4");
+            var ext = streamInfo.Container.Name.ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(ext)) ext = "mp4";
+
+            var filePath = Path.Combine(downloadsFolder, $"{cleanTitle}.{ext}");
 
             // Avoid collision
             int counter = 1;
             while (File.Exists(filePath))
             {
-                filePath = Path.Combine(downloadsFolder, $"{cleanTitle}_{counter}.mp4");
+                filePath = Path.Combine(downloadsFolder, $"{cleanTitle}_{counter}.{ext}");
                 counter++;
             }
 
