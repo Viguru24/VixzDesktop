@@ -74,14 +74,15 @@ namespace VixzDesktop
                     try
                     {
                         var uri = args.Request.Uri.ToLowerInvariant();
-                        if (uri.Contains("doubleclick") || uri.Contains("googleads") || uri.Contains("/pagead/") || uri.Contains("ad_status") || uri.Contains("favicon.ico"))
+                        if (uri.Contains("doubleclick") || uri.Contains("googleads") || uri.Contains("/pagead/") || uri.Contains("ad_status") || uri.Contains("favicon.ico") || uri.Contains("viewthroughconversion"))
                         {
-                            var origin = "https://vixz.app";
+                            string origin = "*";
                             try
                             {
                                 if (args.Request.Headers.Contains("Origin"))
                                 {
                                     origin = args.Request.Headers.GetHeader("Origin");
+                                    if (string.IsNullOrWhiteSpace(origin)) origin = "*";
                                 }
                             }
                             catch { }
@@ -97,7 +98,7 @@ namespace VixzDesktop
                             else if (uri.Contains("favicon.ico"))
                             {
                                 contentType = "image/x-icon";
-                                bodyBytes = Array.Empty<byte>();
+                                bodyBytes = new byte[] { 0, 0, 1, 0, 1, 0, 1, 1, 0, 0, 1, 0, 32, 0, 68, 0, 0, 0, 22, 0, 0, 0, 40, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 1, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
                             }
                             else
                             {
@@ -105,7 +106,7 @@ namespace VixzDesktop
                                 bodyBytes = System.Text.Encoding.UTF8.GetBytes("{\"status\":\"ok\",\"id\":\"0\"}");
                             }
 
-                            var headers = $"Content-Type: {contentType}\r\nAccess-Control-Allow-Origin: {origin}\r\nAccess-Control-Allow-Credentials: true\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: *";
+                            var headers = $"Content-Type: {contentType}\r\nAccess-Control-Allow-Origin: {origin}\r\nAccess-Control-Allow-Credentials: true\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE\r\nAccess-Control-Allow-Headers: *";
                             var emptyStream = new MemoryStream(bodyBytes);
                             args.Response = MiniWebView.CoreWebView2.Environment.CreateWebResourceResponse(
                                 emptyStream,

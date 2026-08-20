@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 using YoutubeExplode;
 using YoutubeExplode.Videos.Streams;
@@ -18,7 +19,15 @@ namespace VixzDesktop.Services
                 throw new ArgumentException("Video ID cannot be empty", nameof(videoId));
             }
 
-            var manifest = await _client.Videos.Streams.GetManifestAsync(videoId);
+            StreamManifest manifest;
+            try
+            {
+                manifest = await _client.Videos.Streams.GetManifestAsync(videoId);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Failed to fetch video streams from YouTube ({ex.Message}). The video might be restricted or require sign-in.", ex);
+            }
 
             // 1. Try muxed streams (combined audio & video)
             IStreamInfo? streamInfo = manifest.GetMuxedStreams().GetWithHighestVideoQuality();
@@ -39,22 +48,25 @@ namespace VixzDesktop.Services
 
             if (streamInfo == null)
             {
-                throw new Exception("No playable video or audio streams found for download.");
+                throw new Exception("No downloadable media streams available for this video.");
             }
 
             var downloadsFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "Vixz");
             Directory.CreateDirectory(downloadsFolder);
 
-            var cleanTitle = string.Concat(title.Split(Path.GetInvalidFileNameChars())).Trim();
+            // Clean title for Windows filename safety
+            var decodedTitle = WebUtility.HtmlDecode(title ?? "");
+            var invalidChars = Path.GetInvalidFileNameChars();
+            var cleanTitle = new string(decodedTitle.Where(c => !invalidChars.Contains(c)).ToArray()).Trim('.', ' ');
             if (string.IsNullOrWhiteSpace(cleanTitle)) cleanTitle = $"Video_{videoId}";
-            if (cleanTitle.Length > 80) cleanTitle = cleanTitle.Substring(0, 80);
+            if (cleanTitle.Length > 60) cleanTitle = cleanTitle.Substring(0, 60).Trim('.', ' ');
 
             var ext = streamInfo.Container.Name.ToLowerInvariant();
             if (string.IsNullOrWhiteSpace(ext)) ext = "mp4";
 
             var filePath = Path.Combine(downloadsFolder, $"{cleanTitle}.{ext}");
 
-            // Avoid collision
+            // Avoid file collisions
             int counter = 1;
             while (File.Exists(filePath))
             {
@@ -62,7 +74,20 @@ namespace VixzDesktop.Services
                 counter++;
             }
 
-            await _client.Videos.Streams.DownloadAsync(streamInfo, filePath, progress);
+            try
+            {
+                await _client.Videos.Streams.DownloadAsync(streamInfo, filePath, progress);
+            }
+            catch (Exception ex)
+            {
+                // If partial download file exists, remove it
+                if (File.Exists(filePath))
+                {
+                    try { File.Delete(filePath); } catch { }
+                }
+                throw new Exception($"Stream download interrupted: {ex.Message}", ex);
+            }
+
             return filePath;
         }
     }
