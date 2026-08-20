@@ -222,13 +222,14 @@ namespace VixzDesktop.Services
                 };
             }
 
-            // 6. Gemini LLM (if API Key provided in Settings)
-            if (!string.IsNullOrWhiteSpace(StorageService.Settings.GeminiApiKey))
+            // 6. Real Conversational LLM Brain (Groq / Gemini / OpenAI)
+            var apiKey = StorageService.Settings.GeminiApiKey;
+            if (!string.IsNullOrWhiteSpace(apiKey))
             {
-                var geminiResult = await QueryGeminiLlmAsync(cleanPrompt, currentPlayingVideo, StorageService.Settings.GeminiApiKey);
-                if (geminiResult != null)
+                var llmResult = await QueryLlmBrainAsync(cleanPrompt, currentPlayingVideo, apiKey);
+                if (llmResult != null)
                 {
-                    return geminiResult;
+                    return llmResult;
                 }
             }
 
@@ -363,41 +364,161 @@ namespace VixzDesktop.Services
             }
         }
 
-        public static async Task<AiCommandResult?> QueryGeminiLlmAsync(string prompt, VideoItem? currentVideo, string apiKey)
+        private static readonly List<(string Role, string Content)> _conversationHistory = new List<(string Role, string Content)>();
+
+        public static async Task<AiCommandResult?> QueryLlmBrainAsync(string prompt, VideoItem? currentVideo, string apiKey)
         {
             try
             {
-                var endpoint = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={apiKey}";
-                var contextPrompt = "You are Vixz AI, a powerful, helpful AI assistant integrated into the Vixz Desktop YouTube player application on Windows. Be concise, informative, and friendly.\n";
-                if (currentVideo != null)
-                {
-                    contextPrompt += $"Currently playing video: \"{currentVideo.Title}\" by channel \"{currentVideo.ChannelTitle}\" (Duration: {currentVideo.DurationText}).\n";
-                }
-                contextPrompt += $"\nUser: {prompt}\n\nVixz AI:";
+                apiKey = apiKey.Trim();
 
-                var payload = new
+                // 1. Groq Provider (Keys starting with gsk_)
+                if (apiKey.StartsWith("gsk_", StringComparison.OrdinalIgnoreCase))
                 {
-                    contents = new[]
+                    using var req = new HttpRequestMessage(HttpMethod.Post, "https://api.groq.com/openai/v1/chat/completions");
+                    req.Headers.Add("Authorization", "Bearer " + apiKey);
+
+                    var systemMsg = "You are Vixz AI, an intelligent, lightning-fast AI assistant integrated inside Vixz Desktop, a modern YouTube player app on Windows. Be direct, clear, highly accurate, concise, and helpful.";
+                    if (currentVideo != null)
                     {
-                        new { parts = new[] { new { text = contextPrompt } } }
+                        systemMsg += $"\n[Context: The user is currently watching video \"{currentVideo.Title}\" by channel \"{currentVideo.ChannelTitle}\" (Duration: {currentVideo.DurationText})]";
                     }
-                };
 
-                var content = new StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
-                var resp = await _httpClient.PostAsync(endpoint, content);
-                if (resp.IsSuccessStatusCode)
-                {
-                    var json = await resp.Content.ReadAsStringAsync();
-                    var jObj = JObject.Parse(json);
-                    var aiText = (string?)jObj["candidates"]?[0]?["content"]?["parts"]?[0]?["text"];
-                    if (!string.IsNullOrWhiteSpace(aiText))
+                    var messages = new List<object>
                     {
-                        return new AiCommandResult
+                        new { role = "system", content = systemMsg }
+                    };
+
+                    // Add past conversation turns for multi-turn conversational memory
+                    foreach (var turn in _conversationHistory.TakeLast(6))
+                    {
+                        messages.Add(new { role = turn.Role, content = turn.Content });
+                    }
+
+                    messages.Add(new { role = "user", content = prompt });
+
+                    var payload = new
+                    {
+                        model = "openai/gpt-oss-120b",
+                        messages = messages,
+                        temperature = 0.5,
+                        max_tokens = 600
+                    };
+
+                    req.Content = new StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
+                    var resp = await _httpClient.SendAsync(req);
+                    if (resp.IsSuccessStatusCode)
+                    {
+                        var json = await resp.Content.ReadAsStringAsync();
+                        var jObj = JObject.Parse(json);
+                        var aiText = (string?)jObj["choices"]?[0]?["message"]?["content"];
+                        if (!string.IsNullOrWhiteSpace(aiText))
                         {
-                            Type = AiCommandType.ChatAnswer,
-                            ResponseMessage = aiText.Trim(),
-                            SourceCitation = "Gemini AI"
-                        };
+                            var trimmed = aiText.Trim();
+                            _conversationHistory.Add(("user", prompt));
+                            _conversationHistory.Add(("assistant", trimmed));
+                            if (_conversationHistory.Count > 20) _conversationHistory.RemoveRange(0, 4);
+
+                            return new AiCommandResult
+                            {
+                                Type = AiCommandType.ChatAnswer,
+                                ResponseMessage = trimmed,
+                                SourceCitation = "Groq Llama 3 / GPT"
+                            };
+                        }
+                    }
+                }
+                // 2. OpenAI Provider (Keys starting with sk-)
+                else if (apiKey.StartsWith("sk-", StringComparison.OrdinalIgnoreCase))
+                {
+                    using var req = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions");
+                    req.Headers.Add("Authorization", "Bearer " + apiKey);
+
+                    var systemMsg = "You are Vixz AI, an intelligent, helpful AI assistant integrated inside Vixz Desktop. Be direct, clear, concise, and helpful.";
+                    if (currentVideo != null)
+                    {
+                        systemMsg += $"\n[Context: Currently watching \"{currentVideo.Title}\" by \"{currentVideo.ChannelTitle}\"]";
+                    }
+
+                    var messages = new List<object> { new { role = "system", content = systemMsg } };
+                    foreach (var turn in _conversationHistory.TakeLast(6))
+                    {
+                        messages.Add(new { role = turn.Role, content = turn.Content });
+                    }
+                    messages.Add(new { role = "user", content = prompt });
+
+                    var payload = new
+                    {
+                        model = "gpt-4o-mini",
+                        messages = messages,
+                        temperature = 0.5,
+                        max_tokens = 600
+                    };
+
+                    req.Content = new StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
+                    var resp = await _httpClient.SendAsync(req);
+                    if (resp.IsSuccessStatusCode)
+                    {
+                        var json = await resp.Content.ReadAsStringAsync();
+                        var jObj = JObject.Parse(json);
+                        var aiText = (string?)jObj["choices"]?[0]?["message"]?["content"];
+                        if (!string.IsNullOrWhiteSpace(aiText))
+                        {
+                            var trimmed = aiText.Trim();
+                            _conversationHistory.Add(("user", prompt));
+                            _conversationHistory.Add(("assistant", trimmed));
+                            return new AiCommandResult
+                            {
+                                Type = AiCommandType.ChatAnswer,
+                                ResponseMessage = trimmed,
+                                SourceCitation = "OpenAI"
+                            };
+                        }
+                    }
+                }
+                // 3. Google Gemini Provider (Default)
+                else
+                {
+                    var endpoint = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={apiKey}";
+                    var contextPrompt = "You are Vixz AI, a powerful, helpful AI assistant integrated into the Vixz Desktop YouTube player application on Windows. Be concise, informative, and friendly.\n";
+                    if (currentVideo != null)
+                    {
+                        contextPrompt += $"Currently playing video: \"{currentVideo.Title}\" by channel \"{currentVideo.ChannelTitle}\" (Duration: {currentVideo.DurationText}).\n";
+                    }
+
+                    foreach (var turn in _conversationHistory.TakeLast(6))
+                    {
+                        contextPrompt += $"{turn.Role}: {turn.Content}\n";
+                    }
+                    contextPrompt += $"\nUser: {prompt}\n\nVixz AI:";
+
+                    var payload = new
+                    {
+                        contents = new[]
+                        {
+                            new { parts = new[] { new { text = contextPrompt } } }
+                        }
+                    };
+
+                    var content = new StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
+                    var resp = await _httpClient.PostAsync(endpoint, content);
+                    if (resp.IsSuccessStatusCode)
+                    {
+                        var json = await resp.Content.ReadAsStringAsync();
+                        var jObj = JObject.Parse(json);
+                        var aiText = (string?)jObj["candidates"]?[0]?["content"]?["parts"]?[0]?["text"];
+                        if (!string.IsNullOrWhiteSpace(aiText))
+                        {
+                            var trimmed = aiText.Trim();
+                            _conversationHistory.Add(("user", prompt));
+                            _conversationHistory.Add(("assistant", trimmed));
+                            return new AiCommandResult
+                            {
+                                Type = AiCommandType.ChatAnswer,
+                                ResponseMessage = trimmed,
+                                SourceCitation = "Gemini AI"
+                            };
+                        }
                     }
                 }
             }
