@@ -18,6 +18,9 @@ namespace VixzDesktop
         private DispatcherTimer? _sleepTimer;
         private int _sleepRemainingSeconds = 0;
 
+        private DispatcherTimer? _controlsTimer;
+        private bool _controlsVisible = false;
+
         public PopOutPlayerWindow(MainWindow mainWindow, VideoItem video, double startPositionSeconds = 0)
         {
             InitializeComponent();
@@ -27,9 +30,62 @@ namespace VixzDesktop
 
             MiniVideoTitle.Text = video.Title;
             UpdateFavoriteUi();
+            InitializeControlsTimer();
 
             Loaded += PopOutPlayerWindow_Loaded;
             Closing += PopOutPlayerWindow_Closing;
+        }
+
+        private void InitializeControlsTimer()
+        {
+            _controlsTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(2.0)
+            };
+            _controlsTimer.Tick += (s, e) =>
+            {
+                _controlsTimer.Stop();
+                HideControls();
+            };
+        }
+
+        private void ShowControls()
+        {
+            _controlsTimer?.Stop();
+            _controlsTimer?.Start();
+
+            if (_controlsVisible) return;
+            _controlsVisible = true;
+
+            var anim = new System.Windows.Media.Animation.DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(150));
+            HeaderOverlay?.BeginAnimation(OpacityProperty, anim);
+            FooterOverlay?.BeginAnimation(OpacityProperty, anim);
+        }
+
+        private void HideControls()
+        {
+            _controlsTimer?.Stop();
+            if (!_controlsVisible) return;
+            _controlsVisible = false;
+
+            var anim = new System.Windows.Media.Animation.DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(250));
+            HeaderOverlay?.BeginAnimation(OpacityProperty, anim);
+            FooterOverlay?.BeginAnimation(OpacityProperty, anim);
+        }
+
+        private void Window_MouseMove(object sender, MouseEventArgs e)
+        {
+            ShowControls();
+        }
+
+        private void Window_MouseEnter(object sender, MouseEventArgs e)
+        {
+            ShowControls();
+        }
+
+        private void Window_MouseLeave(object sender, MouseEventArgs e)
+        {
+            HideControls();
         }
 
         private async void PopOutPlayerWindow_Loaded(object sender, RoutedEventArgs e)

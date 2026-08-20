@@ -117,17 +117,33 @@ namespace VixzDesktop
                         if (startSec > 3) {
                             try { e.target.seekTo(startSec, true); } catch(err) {}
                         }
-                        e.target.playVideo();
+                        try { e.target.playVideo(); } catch(err) {}
+                        setTimeout(function() { try { e.target.playVideo(); } catch(err) {} }, 250);
+                        setTimeout(function() { try { if (e.target.getPlayerState() !== 1) e.target.playVideo(); } catch(err) {} }, 750);
                     },
                     'onStateChange': onPlayerStateChange
                 }
             });
         }
 
+        var _autoPlayRetries = 0;
         function onPlayerStateChange(event) {
             if (event.data === 0) { // Ended
                 if (window.chrome && window.chrome.webview) {
                     window.chrome.webview.postMessage('VIDEO_ENDED');
+                }
+            }
+            // Auto-resume if YouTube pauses during initial load/seek
+            if (event.data === 2 || event.data === -1) {
+                if (_autoPlayRetries < 3) {
+                    _autoPlayRetries++;
+                    setTimeout(function() {
+                        try {
+                            if (player && typeof player.playVideo === 'function' && player.getPlayerState() !== 1) {
+                                player.playVideo();
+                            }
+                        } catch(e) {}
+                    }, 300);
                 }
             }
         }

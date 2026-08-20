@@ -4,13 +4,16 @@
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         Title="Vixz - Floating Player"
         Icon="App.ico"
-        Height="400" Width="600"
-        MinHeight="260" MinWidth="380"
+        Height="360" Width="640"
+        MinHeight="220" MinWidth="340"
         WindowStartupLocation="Manual"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
-        Topmost="True">
+        Topmost="True"
+        MouseMove="Window_MouseMove"
+        MouseEnter="Window_MouseEnter"
+        MouseLeave="Window_MouseLeave">
 
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="0"
@@ -20,26 +23,23 @@
     </WindowChrome.WindowChrome>
 
     <!-- Outer Floating Glass Container -->
-    <Border Background="{StaticResource BgDarkPrimary}"
-            BorderBrush="{StaticResource AccentGold}"
+    <Border Background="Black"
+            BorderBrush="{StaticResource AccentOrange}"
             BorderThickness="1.5"
-            CornerRadius="14"
+            CornerRadius="12"
             ClipToBounds="True">
-        <Grid>
-            <Grid.RowDefinitions>
-                <!-- Mini Header Bar -->
-                <RowDefinition Height="36"/>
-                <!-- Video WebView2 Container -->
-                <RowDefinition Height="*"/>
-                <!-- Mini Utility Deck -->
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
+        <Grid x:Name="MainOverlayGrid">
+            <!-- 1. FULLSCREEN VIDEO PLAYER (Fills 100% of window edge-to-edge) -->
+            <wv2:WebView2 x:Name="MiniWebView" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
 
-            <!-- 1. DRAGGABLE TITLE BAR -->
-            <Border Grid.Row="0"
-                    Background="{StaticResource BgDarkSecondary}"
+            <!-- 2. AUTO-HIDING FLOATING HEADER OVERLAY -->
+            <Border x:Name="HeaderOverlay"
+                    VerticalAlignment="Top"
+                    Height="38"
+                    Background="#E60D0D14"
                     BorderBrush="{StaticResource BorderSubtle}"
                     BorderThickness="0,0,0,1"
+                    Opacity="0"
                     MouseDown="TitleBar_MouseDown">
                 <Grid Margin="12,0,8,0">
                     <Grid.ColumnDefinitions>
@@ -48,31 +48,32 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <Border CornerRadius="4" ClipToBounds="True" Width="18" Height="18" Margin="0,0,6,0">
-                            <Image Source="App.png" Width="18" Height="18" RenderOptions.BitmapScalingMode="HighQuality"/>
+                        <Border CornerRadius="4" ClipToBounds="True" Width="20" Height="20" Margin="0,0,8,0">
+                            <Image Source="App.png" Width="20" Height="20" RenderOptions.BitmapScalingMode="HighQuality"/>
                         </Border>
-                        <TextBlock x:Name="MiniVideoTitle" Text="Vixz Floating Player" Foreground="White" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxWidth="360"/>
+                        <TextBlock x:Name="MiniVideoTitle" Text="Vixz Floating Player" Foreground="White" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxWidth="380"/>
                     </StackPanel>
 
                     <!-- Header Controls -->
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                         <!-- Pin / Topmost Toggle -->
-                        <Button x:Name="PinBtn" Content="📌" Style="{StaticResource IconActionButton}" Width="24" Height="24" ToolTip="Toggle Always-On-Top" Margin="0,0,4,0" Click="PinBtn_Click"/>
+                        <Button x:Name="PinBtn" Content="📌" Style="{StaticResource IconActionButton}" Width="26" Height="26" ToolTip="Toggle Always-On-Top" Margin="0,0,4,0" Click="PinBtn_Click"/>
                         <!-- Dock Back / Restore to Main Window -->
-                        <Button Content="🗖" Style="{StaticResource IconActionButton}" Width="24" Height="24" ToolTip="Dock Back to Main Window" Margin="0,0,4,0" Click="DockBackBtn_Click"/>
+                        <Button Content="🗖" Style="{StaticResource IconActionButton}" Width="26" Height="26" ToolTip="Dock Back to Main Window" Margin="0,0,4,0" Click="DockBackBtn_Click"/>
                         <!-- Close Window -->
-                        <Button Content="✕" Style="{StaticResource IconActionButton}" Width="24" Height="24" ToolTip="Close Mini Player" Click="CloseBtn_Click"/>
+                        <Button Content="✕" Style="{StaticResource IconActionButton}" Width="26" Height="26" ToolTip="Close Mini Player" Click="CloseBtn_Click"/>
                     </StackPanel>
                 </Grid>
             </Border>
 
-            <!-- 2. VIDEO PLAYER CONTAINER -->
-            <Grid Grid.Row="1" Background="Black">
-                <wv2:WebView2 x:Name="MiniWebView"/>
-            </Grid>
-
-            <!-- 3. MINI UTILITY DECK & CONTROLS -->
-            <Border Grid.Row="2" Background="{StaticResource BgDarkSecondary}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="0,1,0,0" Padding="10,8">
+            <!-- 3. AUTO-HIDING FLOATING FOOTER OVERLAY -->
+            <Border x:Name="FooterOverlay"
+                    VerticalAlignment="Bottom"
+                    Background="#E60D0D14"
+                    BorderBrush="{StaticResource BorderSubtle}"
+                    BorderThickness="0,1,0,0"
+                    Padding="10,6"
+                    Opacity="0">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
