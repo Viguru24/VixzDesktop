@@ -706,6 +706,11 @@ namespace VixzDesktop
                 await InitializeWebViewAsync();
             }
 
+            if (VideoWebView.CoreWebView2 != null)
+            {
+                VideoWebView.CoreWebView2.IsMuted = false;
+            }
+
             // Load SponsorBlock segments in background
             _activeSponsorSegments = await SponsorBlockService.GetSegmentsAsync(video.Id);
 
@@ -775,14 +780,26 @@ namespace VixzDesktop
                 return;
             }
 
+            // 1. Synchronously mute main window WebView2 audio stream on line 1 before any async calls
+            if (VideoWebView.CoreWebView2 != null)
+            {
+                VideoWebView.CoreWebView2.IsMuted = true;
+            }
+
             double curSec = 0;
             try
             {
                 var timeStr = await VideoWebView.ExecuteScriptAsync("getCurrentTime()");
                 double.TryParse(timeStr, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out curSec);
-                await VideoWebView.ExecuteScriptAsync("pauseVideo();");
+                await VideoWebView.ExecuteScriptAsync("document.querySelectorAll('video, audio').forEach(m => { m.pause(); m.muted = true; }); if (window.player && typeof window.player.pauseVideo === 'function') window.player.pauseVideo();");
             }
             catch { }
+
+            // Mute Main WebView2 natively at Chromium host level to guarantee 0 duplicate sound
+            if (VideoWebView.CoreWebView2 != null)
+            {
+                VideoWebView.CoreWebView2.IsMuted = true;
+            }
 
             _popOutWindow?.Close();
             _popOutWindow = new PopOutPlayerWindow(this, _currentVideo, curSec);
@@ -799,6 +816,10 @@ namespace VixzDesktop
         public void ReturnFromPopOut(VideoItem video, double positionSeconds)
         {
             _popOutWindow = null;
+            if (VideoWebView.CoreWebView2 != null)
+            {
+                VideoWebView.CoreWebView2.IsMuted = false;
+            }
             VideoWebView.Visibility = Visibility.Visible;
             SwitchToPlayerView();
             _ = PlayVideoAsync(video, positionSeconds);
