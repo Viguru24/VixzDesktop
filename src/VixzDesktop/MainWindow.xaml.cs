@@ -55,7 +55,7 @@ namespace VixzDesktop
                 var appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "VixzDesktop");
                 var userDataFolder = Path.Combine(appData, "WebView2Profile");
 
-                var options = new CoreWebView2EnvironmentOptions("--autoplay-policy=no-user-gesture-required --disable-features=PreloadMediaEngagementData");
+                var options = new CoreWebView2EnvironmentOptions("--autoplay-policy=no-user-gesture-required --disable-features=PreloadMediaEngagementData,TrackingPrevention --disable-web-security --allow-running-insecure-content");
                 var env = await CoreWebView2Environment.CreateAsync(userDataFolder: userDataFolder, options: options);
                 await VideoWebView.EnsureCoreWebView2Async(env);
 

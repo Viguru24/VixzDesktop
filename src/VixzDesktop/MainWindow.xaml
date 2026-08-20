@@ -119,12 +119,12 @@
 
                     <!-- Window Action Controls -->
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                        <!-- ✨ AI Copilot Button -->
+                        <!-- ✨ Vixz AI Button -->
                         <Button x:Name="AiCopilotBtn"
-                                Content="✨ AI Copilot"
+                                Content="✨ Vixz AI"
                                 Style="{StaticResource GlassButton}"
                                 Padding="10,4" Margin="0,0,10,0"
-                                ToolTip="Open AI Copilot &amp; Assistant"
+                                ToolTip="Open Vixz AI Assistant"
                                 Click="AiCopilotBtn_Click"/>
 
                         <!-- Always-on-Top Pin Button -->
@@ -585,7 +585,7 @@
                         <!-- Header -->
                         <Grid Grid.Row="0" Margin="0,0,0,12">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="✨ Vixz AI Copilot" Foreground="White" FontSize="15" FontWeight="Bold"/>
+                                <TextBlock Text="✨ Vixz AI" Foreground="White" FontSize="15" FontWeight="Bold"/>
                                 <Border Background="#33FFD700" CornerRadius="8" Padding="6,2" Margin="8,0,0,0">
                                     <TextBlock Text="VOICE &amp; COMMANDS" Foreground="{StaticResource AccentGold}" FontSize="9" FontWeight="Bold"/>
                                 </Border>
