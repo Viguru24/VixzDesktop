@@ -10,24 +10,6 @@ using VixzDesktop.Models;
 
 namespace VixzDesktop.Services
 {
-    public class VideoSummaryResult
-    {
-        public string VideoId { get; set; } = string.Empty;
-        public string VideoTitle { get; set; } = string.Empty;
-        public string ChannelTitle { get; set; } = string.Empty;
-        public string Tldr { get; set; } = string.Empty;
-        public List<string> KeyTakeaways { get; set; } = new List<string>();
-        public List<TimestampChapter> Chapters { get; set; } = new List<TimestampChapter>();
-        public bool HasTranscript { get; set; } = false;
-    }
-
-    public class TimestampChapter
-    {
-        public double Seconds { get; set; }
-        public string TimeFormatted { get; set; } = string.Empty;
-        public string Title { get; set; } = string.Empty;
-    }
-
     public enum AiCommandType
     {
         PlayVideo,
@@ -42,61 +24,90 @@ namespace VixzDesktop.Services
 
     public class AiCommandResult
     {
-        public AiCommandType Type { get; set; } = AiCommandType.GeneralAnswer;
-        public string ResponseMessage { get; set; } = string.Empty;
+        public AiCommandType Type { get; set; }
+        public string ResponseMessage { get; set; } = "";
         public VideoItem? TargetVideo { get; set; }
-        public VideoSummaryResult? Summary { get; set; }
         public double? SeekSeconds { get; set; }
         public int? TimerMinutes { get; set; }
-        public string? SearchQuery { get; set; }
+        public string SearchQuery { get; set; } = "";
         public string? SpFilter { get; set; }
+        public VideoSummaryResult? Summary { get; set; }
+    }
+
+    public class VideoSummaryResult
+    {
+        public string VideoId { get; set; } = "";
+        public string VideoTitle { get; set; } = "";
+        public string ChannelTitle { get; set; } = "";
+        public string Tldr { get; set; } = "";
+        public List<string> KeyTakeaways { get; set; } = new List<string>();
+        public List<TimestampChapter> Chapters { get; set; } = new List<TimestampChapter>();
+        public bool HasTranscript { get; set; }
+    }
+
+    public class TimestampChapter
+    {
+        public double Seconds { get; set; }
+        public string TimeFormatted { get; set; } = "";
+        public string Title { get; set; } = "";
     }
 
     public class AiCopilotService
     {
         private static readonly YoutubeClient _client = new YoutubeClient();
 
-        public static async Task<AiCommandResult> ProcessCommandAsync(string prompt, VideoItem? currentVideo)
+        public static async Task<AiCommandResult> ProcessCommandAsync(string prompt, VideoItem? currentPlayingVideo)
         {
             if (string.IsNullOrWhiteSpace(prompt))
             {
-                return new AiCommandResult { ResponseMessage = "How can I help you today? Ask me to play a video, summarise what's playing, or control playback." };
+                return new AiCommandResult
+                {
+                    Type = AiCommandType.GeneralAnswer,
+                    ResponseMessage = "Please type or speak a command (e.g., *\"Play the latest Benny Johnson video\"* or *\"Summarise this video\"*)."
+                };
             }
 
-            var clean = prompt.Trim();
-            var lower = clean.ToLowerInvariant();
+            var lower = prompt.Trim().ToLowerInvariant();
 
-            // 1. Summarize Video Command (Check first if user asked for summary)
-            if (lower.Contains("summar") || lower.Contains("tl;dr") || lower.Contains("tldr") || 
-                lower.Contains("key point") || lower.Contains("key takeaway") || lower.Contains("what is this video") ||
-                lower.Contains("explain this video") || lower.Contains("notes"))
+            // 1. Summarize Command
+            if (lower.Contains("summar") || lower.Contains("tl;dr") || lower.Contains("explain this video") || lower.Contains("tldr"))
             {
-                if (currentVideo == null)
+                if (currentPlayingVideo == null)
                 {
                     return new AiCommandResult
                     {
                         Type = AiCommandType.GeneralAnswer,
-                        ResponseMessage = "⚠️ No video is currently playing. Start a video and ask me to summarise it!"
+                        ResponseMessage = "⚠️ No video is currently playing to summarize. Play a video first, then ask me to summarize it!"
                     };
                 }
 
-                var summary = await GenerateSummaryAsync(currentVideo);
+                var sum = await GenerateSummaryAsync(currentPlayingVideo);
+
                 return new AiCommandResult
                 {
                     Type = AiCommandType.Summarize,
-                    Summary = summary,
-                    ResponseMessage = $"✨ Here is the AI summary for **{currentVideo.Title}**:"
+                    TargetVideo = currentPlayingVideo,
+                    Summary = sum,
+                    ResponseMessage = $"✨ Summarizing **{currentPlayingVideo.Title}**..."
                 };
             }
 
-            // 2. Play Latest Creator / Topic Video Command (e.g. "latest Dr Steve Turley", "play the latest Benny Johnson video", "Tucker Carlson today")
-            bool isLatestQuery = lower.Contains("latest") || lower.Contains("newest") || lower.Contains("recent") || 
-                                 lower.Contains("today") || lower.StartsWith("play") || lower.StartsWith("watch") || 
-                                 lower.StartsWith("show") || lower.StartsWith("get");
+            // 2. Play Video Command (e.g. "play latest Benny Johnson", "play Tucker Carlson today")
+            var playMatch = Regex.Match(lower, @"(?:play|watch|show|open|start)\s*(?:the)?\s*(?:latest|newest|today's)?\s*(.+)", RegexOptions.IgnoreCase);
+            bool isLatestQuery = lower.Contains("latest") || lower.Contains("newest") || lower.Contains("today");
 
-            string candidateTarget = clean;
-            candidateTarget = Regex.Replace(candidateTarget, @"\b(play|watch|show|get|the|latest|newest|recent|video|videos|by|from|of|today|now|please|i asked for|give me|find)\b", " ", RegexOptions.IgnoreCase).Trim();
-            candidateTarget = Regex.Replace(candidateTarget, @"\s+", " ").Trim();
+            string candidateTarget = "";
+            if (playMatch.Success)
+            {
+                candidateTarget = playMatch.Groups[1].Value.Trim();
+            }
+            else if (isLatestQuery)
+            {
+                candidateTarget = prompt.Replace("latest", "", StringComparison.OrdinalIgnoreCase)
+                                        .Replace("newest", "", StringComparison.OrdinalIgnoreCase)
+                                        .Replace("today", "", StringComparison.OrdinalIgnoreCase)
+                                        .Trim();
+            }
 
             if (!string.IsNullOrWhiteSpace(candidateTarget) && candidateTarget.Length >= 2 && candidateTarget != "this" && (isLatestQuery || candidateTarget.Split(' ').Length >= 2))
             {
@@ -126,7 +137,7 @@ namespace VixzDesktop.Services
                 }
             }
 
-            // 3. Sleep Timer Command (e.g. "set sleep timer for 30 minutes", "stop in 20 mins")
+            // 3. Sleep Timer Command
             var timerMatch = Regex.Match(lower, @"(?:sleep\s*timer|stop|turn\s*off|sleep)\s*(?:in|for)?\s*(\d+)\s*(?:min|minutes|m)?", RegexOptions.IgnoreCase);
             if (timerMatch.Success && int.TryParse(timerMatch.Groups[1].Value, out int minutes))
             {
@@ -138,7 +149,7 @@ namespace VixzDesktop.Services
                 };
             }
 
-            // 4. Seek / Fast-Forward / Rewind Commands (e.g. "skip 30 seconds", "go back 10s", "rewind 1 minute")
+            // 4. Seek / Fast-Forward / Rewind Commands
             var seekForwardMatch = Regex.Match(lower, @"(?:skip|forward|jump)\s*(?:ahead)?\s*(\d+)\s*(?:s|sec|seconds)?", RegexOptions.IgnoreCase);
             if (seekForwardMatch.Success && double.TryParse(seekForwardMatch.Groups[1].Value, out double fwdSec))
             {
@@ -180,7 +191,7 @@ namespace VixzDesktop.Services
                 };
             }
 
-            // 6. Generic Search Command (e.g. "find podcasts from today", "search AI tutorials")
+            // 6. Generic Search Command
             var searchMatch = Regex.Match(lower, @"(?:search|find|show me|look for)\s+(.+)", RegexOptions.IgnoreCase);
             if (searchMatch.Success)
             {
@@ -222,8 +233,11 @@ namespace VixzDesktop.Services
             try
             {
                 var trackManifest = await _client.Videos.ClosedCaptions.GetManifestAsync(video.Id);
-                var trackInfo = trackManifest.TryGetByLanguage("en") ?? 
-                                trackManifest.Tracks.FirstOrDefault(t => t.Language.Code.StartsWith("en", StringComparison.OrdinalIgnoreCase)) ?? 
+
+                // Robust caption track selection (manual English, auto-generated "a.en", or any English track)
+                var trackInfo = trackManifest.Tracks.FirstOrDefault(t => t.Language.Code.Equals("en", StringComparison.OrdinalIgnoreCase)) ??
+                                trackManifest.Tracks.FirstOrDefault(t => t.Language.Code.Contains("en", StringComparison.OrdinalIgnoreCase)) ??
+                                trackManifest.Tracks.FirstOrDefault(t => t.Language.Name.Contains("English", StringComparison.OrdinalIgnoreCase)) ??
                                 trackManifest.Tracks.FirstOrDefault();
 
                 if (trackInfo != null)
@@ -245,7 +259,7 @@ namespace VixzDesktop.Services
 
                             if (cap.Offset.TotalSeconds >= nextChapterMark && summary.Chapters.Count < 6)
                             {
-                                var cleanSnippet = text.Length > 40 ? text.Substring(0, 40) + "..." : text;
+                                var cleanSnippet = text.Length > 45 ? text.Substring(0, 42) + "..." : text;
                                 summary.Chapters.Add(new TimestampChapter
                                 {
                                     Seconds = cap.Offset.TotalSeconds,
@@ -283,37 +297,74 @@ namespace VixzDesktop.Services
 
         private static void GenerateStructuredPoints(string text, VideoItem video, VideoSummaryResult summary)
         {
-            var sentences = text.Split(new[] { '.', '!', '?' }, StringSplitOptions.RemoveEmptyEntries)
-                                .Select(s => s.Trim())
-                                .Where(s => s.Length > 20 && !s.Contains("http") && !s.Contains("subscribe", StringComparison.OrdinalIgnoreCase))
-                                .ToList();
+            var rawSentences = text.Split(new[] { '.', '!', '?', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
+                                   .Select(s => s.Trim())
+                                   .ToList();
 
-            if (sentences.Count == 0)
+            var cleanSentences = new List<string>();
+            foreach (var s in rawSentences)
             {
-                summary.Tldr = $"A video titled **{video.Title}** published by **{video.ChannelTitle}**.";
-                summary.KeyTakeaways.Add("Full transcript is unavailable for this upload.");
-                summary.KeyTakeaways.Add($"Duration: {video.DurationText} • Published: {video.UploadDateText}");
+                var lower = s.ToLowerInvariant();
+
+                // Filter out URLs, social handles, promo noise, discount codes, subscribe begging
+                if (lower.Contains("http") || lower.Contains("www.") || lower.Contains(".com") || 
+                    lower.Contains("@") || lower.Contains("subscribe") || lower.Contains("patreon") || 
+                    lower.Contains("twitter") || lower.Contains("instagram") || lower.Contains("facebook") ||
+                    lower.Contains("tiktok") || lower.Contains("discount") || lower.Contains("promo code") ||
+                    lower.Contains("merch") || lower.Contains("sponsor") || lower.Contains("affiliate"))
+                {
+                    continue;
+                }
+
+                // Remove excessive whitespace
+                var cleaned = Regex.Replace(s, @"\s+", " ").Trim();
+                if (cleaned.Length < 18) continue;
+
+                // Ignore exact video title duplicates
+                if (cleaned.Equals(video.Title, StringComparison.OrdinalIgnoreCase)) continue;
+
+                // Capitalize first letter
+                if (char.IsLower(cleaned[0]))
+                {
+                    cleaned = char.ToUpper(cleaned[0]) + cleaned.Substring(1);
+                }
+
+                if (!cleanSentences.Contains(cleaned, StringComparer.OrdinalIgnoreCase))
+                {
+                    cleanSentences.Add(cleaned);
+                }
+            }
+
+            if (cleanSentences.Count == 0)
+            {
+                summary.Tldr = $"**{video.Title}** by **{video.ChannelTitle}** focuses on key reporting, commentary, and news analysis.";
+                summary.KeyTakeaways.Add($"Coverage of: {video.Title}");
+                summary.KeyTakeaways.Add($"Channel: {video.ChannelTitle}");
+                summary.KeyTakeaways.Add($"Upload details: {video.UploadDateText} • Duration: {video.DurationText}");
                 return;
             }
 
-            // Executive TL;DR (Top informative sentences)
-            var tldrSentences = sentences.Take(3).ToList();
-            summary.Tldr = string.Join(". ", tldrSentences) + ".";
+            // Executive TL;DR: 2 to 3 substantive sentences forming a clean summary paragraph
+            var tldrList = cleanSentences.Take(3).ToList();
+            summary.Tldr = string.Join(". ", tldrList);
+            if (!summary.Tldr.EndsWith(".")) summary.Tldr += ".";
 
-            // Key Takeaways
+            // Key Takeaways: 3 to 5 distinct points distributed across the timeline
             var keyPoints = new List<string>();
-            var step = Math.Max(1, sentences.Count / 5);
-            for (int i = 0; i < sentences.Count && keyPoints.Count < 5; i += step)
+            if (cleanSentences.Count <= 5)
             {
-                var sentence = sentences[i];
-                if (sentence.Length > 120) sentence = sentence.Substring(0, 117) + "...";
-                keyPoints.Add(sentence);
+                keyPoints.AddRange(cleanSentences);
             }
-
-            if (keyPoints.Count == 0)
+            else
             {
-                keyPoints.Add($"Key reporting and commentary from {video.ChannelTitle}.");
-                keyPoints.Add($"Discussion covering: {video.Title}.");
+                var step = cleanSentences.Count / 5.0;
+                for (int i = 0; i < 5; i++)
+                {
+                    int index = Math.Min(cleanSentences.Count - 1, (int)(i * step));
+                    var pt = cleanSentences[index];
+                    if (pt.Length > 130) pt = pt.Substring(0, 127) + "...";
+                    if (!keyPoints.Contains(pt)) keyPoints.Add(pt);
+                }
             }
 
             summary.KeyTakeaways = keyPoints;
