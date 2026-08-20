@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Newtonsoft.Json.Linq;
 using YoutubeExplode;
 using YoutubeExplode.Videos.ClosedCaptions;
 using VixzDesktop.Models;
@@ -19,6 +22,8 @@ namespace VixzDesktop.Services
         ControlPlay,
         SetSleepTimer,
         SearchFeed,
+        ChatAnswer,
+        VideoQna,
         GeneralAnswer
     }
 
@@ -32,6 +37,9 @@ namespace VixzDesktop.Services
         public string SearchQuery { get; set; } = "";
         public string? SpFilter { get; set; }
         public VideoSummaryResult? Summary { get; set; }
+        public List<string> WebFacts { get; set; } = new List<string>();
+        public List<TimestampChapter> TimestampJumps { get; set; } = new List<TimestampChapter>();
+        public string? SourceCitation { get; set; }
     }
 
     public class VideoSummaryResult
@@ -55,6 +63,20 @@ namespace VixzDesktop.Services
     public class AiCopilotService
     {
         private static readonly YoutubeClient _client = new YoutubeClient();
+        private static readonly HttpClient _httpClient = CreateHttpClient();
+
+        private static HttpClient CreateHttpClient()
+        {
+            var handler = new HttpClientHandler
+            {
+                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate | DecompressionMethods.Brotli
+            };
+            var client = new HttpClient(handler);
+            client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36");
+            client.DefaultRequestHeaders.Add("Accept-Language", "en-US,en;q=0.9");
+            client.Timeout = TimeSpan.FromSeconds(8);
+            return client;
+        }
 
         public static async Task<AiCommandResult> ProcessCommandAsync(
             string prompt, 
@@ -66,81 +88,24 @@ namespace VixzDesktop.Services
                 return new AiCommandResult
                 {
                     Type = AiCommandType.GeneralAnswer,
-                    ResponseMessage = "Please type or speak a command (e.g., *\"Play the latest Benny Johnson video\"* or *\"Summarise this video\"*)."
+                    ResponseMessage = "Please type or speak anything! Ask me about the current video, search the web, ask general knowledge, or control playback."
                 };
             }
 
-            var lower = prompt.Trim().ToLowerInvariant();
+            var cleanPrompt = prompt.Trim();
+            var lower = cleanPrompt.ToLowerInvariant();
 
-            // 1. Summarize Command
-            if (lower.Contains("summar") || lower.Contains("tl;dr") || lower.Contains("explain this video") || lower.Contains("tldr"))
+            // 1. Playback Controls (Pause / Resume / Seek / Sleep Timer)
+            if (lower == "pause" || lower == "stop" || lower == "stop video" || lower == "pause video" || lower == "freeze")
             {
-                if (currentPlayingVideo == null)
-                {
-                    return new AiCommandResult
-                    {
-                        Type = AiCommandType.GeneralAnswer,
-                        ResponseMessage = "⚠️ No video is currently playing to summarize. Play a video first, then ask me to summarize it!"
-                    };
-                }
-
-                var sum = await GenerateSummaryAsync(currentPlayingVideo, webViewTranscriptFetcher);
-
-                return new AiCommandResult
-                {
-                    Type = AiCommandType.Summarize,
-                    TargetVideo = currentPlayingVideo,
-                    Summary = sum,
-                    ResponseMessage = $"✨ Summarizing **{currentPlayingVideo.Title}**..."
-                };
+                return new AiCommandResult { Type = AiCommandType.ControlPause, ResponseMessage = "⏸️ Playback paused." };
             }
 
-            // 2. Play Video Command (e.g. "play latest Benny Johnson", "play Tucker Carlson today")
-            var playMatch = Regex.Match(lower, @"(?:play|watch|show|open|start)\s*(?:the)?\s*(?:latest|newest|today's)?\s*(.+)", RegexOptions.IgnoreCase);
-            bool isLatestQuery = lower.Contains("latest") || lower.Contains("newest") || lower.Contains("today");
-
-            string candidateTarget = "";
-            if (playMatch.Success)
+            if (lower == "play" || lower == "resume" || lower == "unpause" || lower == "continue")
             {
-                candidateTarget = playMatch.Groups[1].Value.Trim();
-            }
-            else if (isLatestQuery)
-            {
-                candidateTarget = prompt.Replace("latest", "", StringComparison.OrdinalIgnoreCase)
-                                        .Replace("newest", "", StringComparison.OrdinalIgnoreCase)
-                                        .Replace("today", "", StringComparison.OrdinalIgnoreCase)
-                                        .Trim();
+                return new AiCommandResult { Type = AiCommandType.ControlPlay, ResponseMessage = "▶️ Playback resumed." };
             }
 
-            if (!string.IsNullOrWhiteSpace(candidateTarget) && candidateTarget.Length >= 2 && candidateTarget != "this" && (isLatestQuery || candidateTarget.Split(' ').Length >= 2))
-            {
-                // Search YouTube strictly sorted by upload date (&sp=CAI%3D)
-                var results = await YouTubeService.SearchVideosAsync(candidateTarget, 15, sortByUploadDate: true);
-                if (results.Count > 0)
-                {
-                    // Sort strictly by newest upload
-                    var sortedResults = YouTubeService.ApplyLocalFilters(results, null, null, "latest");
-                    var topVideo = sortedResults.FirstOrDefault() ?? results[0];
-
-                    return new AiCommandResult
-                    {
-                        Type = AiCommandType.PlayVideo,
-                        TargetVideo = topVideo,
-                        ResponseMessage = $"▶️ Playing the latest video from **{topVideo.ChannelTitle}**:\n*{topVideo.Title}* ({topVideo.UploadDateText})"
-                    };
-                }
-                else
-                {
-                    return new AiCommandResult
-                    {
-                        Type = AiCommandType.SearchFeed,
-                        SearchQuery = candidateTarget,
-                        ResponseMessage = $"Couldn't find an exact instant match for \"{candidateTarget}\", showing search results."
-                    };
-                }
-            }
-
-            // 3. Sleep Timer Command
             var timerMatch = Regex.Match(lower, @"(?:sleep\s*timer|stop|turn\s*off|sleep)\s*(?:in|for)?\s*(\d+)\s*(?:min|minutes|m)?", RegexOptions.IgnoreCase);
             if (timerMatch.Success && int.TryParse(timerMatch.Groups[1].Value, out int minutes))
             {
@@ -152,7 +117,6 @@ namespace VixzDesktop.Services
                 };
             }
 
-            // 4. Seek / Fast-Forward / Rewind Commands
             var seekForwardMatch = Regex.Match(lower, @"(?:skip|forward|jump)\s*(?:ahead)?\s*(\d+)\s*(?:s|sec|seconds)?", RegexOptions.IgnoreCase);
             if (seekForwardMatch.Success && double.TryParse(seekForwardMatch.Groups[1].Value, out double fwdSec))
             {
@@ -175,30 +139,74 @@ namespace VixzDesktop.Services
                 };
             }
 
-            // 5. Play / Pause Commands
-            if (lower == "pause" || lower == "stop video" || lower == "pause video" || lower == "freeze")
+            // 2. Video Summarization Command
+            if (lower.Contains("summar") || lower.Contains("tl;dr") || lower.Contains("explain this video") || lower.Contains("tldr"))
             {
+                if (currentPlayingVideo == null)
+                {
+                    return new AiCommandResult
+                    {
+                        Type = AiCommandType.GeneralAnswer,
+                        ResponseMessage = "⚠️ No video is currently playing to summarize. Play a video first, then ask me to summarize it!"
+                    };
+                }
+
+                var sum = await GenerateSummaryAsync(currentPlayingVideo, webViewTranscriptFetcher);
                 return new AiCommandResult
                 {
-                    Type = AiCommandType.ControlPause,
-                    ResponseMessage = "⏸️ Playback paused."
+                    Type = AiCommandType.Summarize,
+                    TargetVideo = currentPlayingVideo,
+                    Summary = sum,
+                    ResponseMessage = $"✨ Summarizing **{currentPlayingVideo.Title}**..."
                 };
             }
 
-            if (lower == "play" || lower == "resume" || lower == "unpause" || lower == "continue")
+            // 3. Video Q&A ("Chat with Video")
+            bool isVideoQuestion = currentPlayingVideo != null && (
+                lower.Contains("in this video") || lower.Contains("this video") || 
+                lower.Contains("he say") || lower.Contains("she say") || lower.Contains("they say") || 
+                lower.Contains("did he") || lower.Contains("did she") || lower.Contains("speaker") ||
+                lower.Contains("mention") || lower.Contains("timestamp") || lower.Contains("where does") ||
+                lower.StartsWith("what does") || lower.StartsWith("why does") || lower.StartsWith("how does")
+            );
+
+            if (isVideoQuestion && currentPlayingVideo != null)
             {
-                return new AiCommandResult
+                var videoQna = await AnswerVideoQuestionAsync(cleanPrompt, currentPlayingVideo, webViewTranscriptFetcher);
+                if (videoQna != null)
                 {
-                    Type = AiCommandType.ControlPlay,
-                    ResponseMessage = "▶️ Playback resumed."
-                };
+                    return videoQna;
+                }
             }
 
-            // 6. Generic Search Command
-            var searchMatch = Regex.Match(lower, @"(?:search|find|show me|look for)\s+(.+)", RegexOptions.IgnoreCase);
-            if (searchMatch.Success)
+            // 4. Play Specific Video Query (e.g. "play latest Benny Johnson", "watch Tucker Carlson")
+            var playMatch = Regex.Match(lower, @"^(?:play|watch|open|start)\s*(?:the)?\s*(?:latest|newest|today's)?\s*(.+)", RegexOptions.IgnoreCase);
+            if (playMatch.Success && !lower.Contains("?"))
             {
-                var q = searchMatch.Groups[1].Value.Trim();
+                var target = playMatch.Groups[1].Value.Trim();
+                if (target.Length >= 2 && target != "this" && target != "video")
+                {
+                    var results = await YouTubeService.SearchVideosAsync(target, 15, sortByUploadDate: true);
+                    if (results.Count > 0)
+                    {
+                        var sortedResults = YouTubeService.ApplyLocalFilters(results, null, null, "latest");
+                        var topVideo = sortedResults.FirstOrDefault() ?? results[0];
+
+                        return new AiCommandResult
+                        {
+                            Type = AiCommandType.PlayVideo,
+                            TargetVideo = topVideo,
+                            ResponseMessage = $"▶️ Playing the latest video from **{topVideo.ChannelTitle}**:\n*{topVideo.Title}* ({topVideo.UploadDateText})"
+                        };
+                    }
+                }
+            }
+
+            // 5. Search Feed / Video Lookup Command
+            var explicitSearchMatch = Regex.Match(lower, @"^(?:search|find|show me|look for)\s+(.+)", RegexOptions.IgnoreCase);
+            if (explicitSearchMatch.Success && !lower.Contains("who") && !lower.Contains("what") && !lower.Contains("why") && !lower.Contains("is there"))
+            {
+                var q = explicitSearchMatch.Groups[1].Value.Trim();
                 string? sp = null;
                 if (lower.Contains("today")) sp = "EgIIAg%3D%3D";
                 else if (lower.Contains("this week")) sp = "EgIIAw%3D%3D";
@@ -214,12 +222,187 @@ namespace VixzDesktop.Services
                 };
             }
 
-            // 7. Conversational response / fallback
+            // 6. Gemini LLM (if API Key provided in Settings)
+            if (!string.IsNullOrWhiteSpace(StorageService.Settings.GeminiApiKey))
+            {
+                var geminiResult = await QueryGeminiLlmAsync(cleanPrompt, currentPlayingVideo, StorageService.Settings.GeminiApiKey);
+                if (geminiResult != null)
+                {
+                    return geminiResult;
+                }
+            }
+
+            // 7. Live Web Knowledge Engine (Zero-Config Built-In Chatbot)
+            var webResult = await QueryLiveWebKnowledgeAsync(cleanPrompt);
+            if (webResult != null)
+            {
+                return webResult;
+            }
+
+            // 8. Conversational Fallback
             return new AiCommandResult
             {
-                Type = AiCommandType.GeneralAnswer,
-                ResponseMessage = $"🤖 I understand commands like:\n• *\"Play the latest Benny Johnson video\"*\n• *\"Summarise this video\"*\n• *\"Skip 30 seconds\"*\n• *\"Set a 25 min sleep timer\"*\n• *\"Find breaking news from today\"*"
+                Type = AiCommandType.ChatAnswer,
+                ResponseMessage = $"🤖 I'm your Vixz AI Assistant! You can ask me questions about current events, search for topics, ask about the current video, or use commands like *\"Summarise this video\"* and *\"Play latest Benny Johnson\"*."
             };
+        }
+
+        public static async Task<AiCommandResult?> QueryLiveWebKnowledgeAsync(string query)
+        {
+            try
+            {
+                var encodedQuery = WebUtility.UrlEncode(query);
+                var searchUrl = $"https://html.duckduckgo.com/html/?q={encodedQuery}";
+
+                var html = await _httpClient.GetStringAsync(searchUrl);
+                var snippetMatches = Regex.Matches(html, @"<a class=""result__snippet[^>]*>(.*?)</a>", RegexOptions.Singleline);
+                var titleMatches = Regex.Matches(html, @"<a class=""result__url[^>]*>(.*?)</a>", RegexOptions.Singleline);
+
+                var cleanSnippets = new List<string>();
+                for (int i = 0; i < snippetMatches.Count && cleanSnippets.Count < 5; i++)
+                {
+                    var raw = snippetMatches[i].Groups[1].Value;
+                    var clean = Regex.Replace(raw, @"<[^>]+>", " ");
+                    clean = WebUtility.HtmlDecode(clean).Trim();
+                    clean = Regex.Replace(clean, @"\s+", " ");
+                    if (clean.Length > 25 && !cleanSnippets.Contains(clean))
+                    {
+                        cleanSnippets.Add(clean);
+                    }
+                }
+
+                if (cleanSnippets.Count == 0) return null;
+
+                // Synthesize the primary direct answer
+                var primaryAnswer = cleanSnippets[0];
+
+                // Gather key points from subsequent snippets
+                var facts = new List<string>();
+                for (int i = 1; i < cleanSnippets.Count; i++)
+                {
+                    var s = cleanSnippets[i];
+                    if (s.Length > 180) s = s.Substring(0, 177) + "...";
+                    facts.Add(s);
+                }
+
+                return new AiCommandResult
+                {
+                    Type = AiCommandType.ChatAnswer,
+                    ResponseMessage = primaryAnswer,
+                    WebFacts = facts,
+                    SourceCitation = "Live Web Intelligence"
+                };
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        public static async Task<AiCommandResult?> AnswerVideoQuestionAsync(
+            string question, 
+            VideoItem video, 
+            Func<string, Task<string>>? webViewTranscriptFetcher)
+        {
+            try
+            {
+                string rawTranscript = "";
+                if (webViewTranscriptFetcher != null)
+                {
+                    try { rawTranscript = await webViewTranscriptFetcher(video.Id); } catch { }
+                }
+
+                if (string.IsNullOrWhiteSpace(rawTranscript))
+                {
+                    return null;
+                }
+
+                // Extract keywords from question
+                var stopWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "what", "where", "when", "why", "how", "who", "does", "did", "say", "about", "the", "in", "this", "video", "mention", "is", "a", "an", "and", "or", "of", "to" };
+                var keywords = question.Split(new[] { ' ', '?', '!', ',', '.' }, StringSplitOptions.RemoveEmptyEntries)
+                                       .Where(w => w.Length > 2 && !stopWords.Contains(w))
+                                       .ToList();
+
+                if (keywords.Count == 0) return null;
+
+                // Scan transcript sentences
+                var sentences = rawTranscript.Split(new[] { '.', '!', '?' }, StringSplitOptions.RemoveEmptyEntries)
+                                             .Select(s => s.Trim())
+                                             .Where(s => s.Length > 20)
+                                             .ToList();
+
+                var matchingSentences = new List<(string Sentence, int Score)>();
+                foreach (var s in sentences)
+                {
+                    int score = 0;
+                    foreach (var kw in keywords)
+                    {
+                        if (s.IndexOf(kw, StringComparison.OrdinalIgnoreCase) >= 0) score++;
+                    }
+                    if (score > 0)
+                    {
+                        matchingSentences.Add((s, score));
+                    }
+                }
+
+                if (matchingSentences.Count == 0) return null;
+
+                var topMatches = matchingSentences.OrderByDescending(m => m.Score).Take(3).Select(m => m.Sentence).ToList();
+                var answerText = $"Regarding your question about **{string.Join(", ", keywords)}** in *{video.Title}*:\n\n" + string.Join(". ", topMatches) + ".";
+
+                return new AiCommandResult
+                {
+                    Type = AiCommandType.VideoQna,
+                    ResponseMessage = answerText,
+                    TargetVideo = video
+                };
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        public static async Task<AiCommandResult?> QueryGeminiLlmAsync(string prompt, VideoItem? currentVideo, string apiKey)
+        {
+            try
+            {
+                var endpoint = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={apiKey}";
+                var contextPrompt = "You are Vixz AI, a powerful, helpful AI assistant integrated into the Vixz Desktop YouTube player application on Windows. Be concise, informative, and friendly.\n";
+                if (currentVideo != null)
+                {
+                    contextPrompt += $"Currently playing video: \"{currentVideo.Title}\" by channel \"{currentVideo.ChannelTitle}\" (Duration: {currentVideo.DurationText}).\n";
+                }
+                contextPrompt += $"\nUser: {prompt}\n\nVixz AI:";
+
+                var payload = new
+                {
+                    contents = new[]
+                    {
+                        new { parts = new[] { new { text = contextPrompt } } }
+                    }
+                };
+
+                var content = new StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
+                var resp = await _httpClient.PostAsync(endpoint, content);
+                if (resp.IsSuccessStatusCode)
+                {
+                    var json = await resp.Content.ReadAsStringAsync();
+                    var jObj = JObject.Parse(json);
+                    var aiText = (string?)jObj["candidates"]?[0]?["content"]?["parts"]?[0]?["text"];
+                    if (!string.IsNullOrWhiteSpace(aiText))
+                    {
+                        return new AiCommandResult
+                        {
+                            Type = AiCommandType.ChatAnswer,
+                            ResponseMessage = aiText.Trim(),
+                            SourceCitation = "Gemini AI"
+                        };
+                    }
+                }
+            }
+            catch { }
+            return null;
         }
 
         public static async Task<VideoSummaryResult> GenerateSummaryAsync(
@@ -235,7 +418,7 @@ namespace VixzDesktop.Services
 
             string rawTranscript = "";
 
-            // 1. Primary: Direct In-Browser Transcript via WebView2 (bypasses YouTube server-side IP blocks)
+            // 1. Primary: Direct In-Browser Transcript via WebView2
             if (webViewTranscriptFetcher != null)
             {
                 try

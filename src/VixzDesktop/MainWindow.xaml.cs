@@ -1818,7 +1818,66 @@ namespace VixzDesktop
                 mainContainer.Children.Add(card);
             }
 
+            // 3. Web Facts / Live Knowledge Card
+            if (result.WebFacts.Count > 0)
+            {
+                var factsCard = new Border
+                {
+                    Background = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#14141E")),
+                    BorderBrush = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#3300E5FF")),
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(12),
+                    Padding = new Thickness(12),
+                    Margin = new Thickness(0, 4, 0, 6)
+                };
+
+                var factStack = new StackPanel();
+                var factHeader = new TextBlock
+                {
+                    Text = "🌐 LIVE WEB INTELLIGENCE & KEY FACTS",
+                    Foreground = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#00E5FF")),
+                    FontSize = 10,
+                    FontWeight = FontWeights.Bold,
+                    Margin = new Thickness(0, 0, 0, 6)
+                };
+                factStack.Children.Add(factHeader);
+
+                foreach (var fact in result.WebFacts)
+                {
+                    var factGrid = new Grid { Margin = new Thickness(0, 2, 0, 2) };
+                    factGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                    factGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+                    var bullet = new TextBlock
+                    {
+                        Text = "• ",
+                        Foreground = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#00E5FF")),
+                        FontSize = 11,
+                        Margin = new Thickness(0, 0, 4, 0)
+                    };
+                    Grid.SetColumn(bullet, 0);
+
+                    var factText = new TextBlock
+                    {
+                        Text = fact,
+                        Foreground = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#CCCCCC")),
+                        FontSize = 11,
+                        LineHeight = 15.5,
+                        TextWrapping = TextWrapping.Wrap
+                    };
+                    Grid.SetColumn(factText, 1);
+
+                    factGrid.Children.Add(bullet);
+                    factGrid.Children.Add(factText);
+                    factStack.Children.Add(factGrid);
+                }
+
+                factsCard.Child = factStack;
+                mainContainer.Children.Add(factsCard);
+            }
+
             AiMessageStack.Children.Add(mainContainer);
+            AiChatScrollViewer.ScrollToEnd();
         }
 
         #endregion

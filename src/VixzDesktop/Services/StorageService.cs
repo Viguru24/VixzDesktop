@@ -26,6 +26,7 @@ namespace VixzDesktop.Services
         public List<string> SubscribedChannels { get; set; } = new List<string>();
         public Dictionary<string, double> WatchPositions { get; set; } = new Dictionary<string, double>();
         public double Volume { get; set; } = 1.0;
+        public string? GeminiApiKey { get; set; } = null;
     }
 
     public static class StorageService
