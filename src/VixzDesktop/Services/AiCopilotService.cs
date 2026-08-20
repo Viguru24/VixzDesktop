@@ -297,6 +297,16 @@ namespace VixzDesktop.Services
 
         private static void GenerateStructuredPoints(string text, VideoItem video, VideoSummaryResult summary)
         {
+            if (string.IsNullOrWhiteSpace(text)) text = "";
+
+            // 1. Strip ALL URLs, domain paths, social handles, and web fragments BEFORE sentence splitting
+            text = Regex.Replace(text, @"https?://\S+", " ", RegexOptions.IgnoreCase);
+            text = Regex.Replace(text, @"\b[\w\-]+\.(?:com|org|net|io|gov|edu|co|tv|app|me|be|yt|link)/\S*", " ", RegexOptions.IgnoreCase);
+            text = Regex.Replace(text, @"\b[\w\-]+/(?:channel|c|user|watch|shorts)/[^\s.]*", " ", RegexOptions.IgnoreCase);
+            text = Regex.Replace(text, @"\b[\w\-]+\.(?:com|org|net|io|gov|edu|co|tv|app|me|be|yt|link)\b", " ", RegexOptions.IgnoreCase);
+            text = Regex.Replace(text, @"@[\w\-]+", " ", RegexOptions.IgnoreCase);
+            text = Regex.Replace(text, @"(?:join|subscribe|membership|merch|sponsor|discount code|promo code)\S*", " ", RegexOptions.IgnoreCase);
+
             var rawSentences = text.Split(new[] { '.', '!', '?', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
                                    .Select(s => s.Trim())
                                    .ToList();
@@ -306,12 +316,13 @@ namespace VixzDesktop.Services
             {
                 var lower = s.ToLowerInvariant();
 
-                // Filter out URLs, social handles, promo noise, discount codes, subscribe begging
-                if (lower.Contains("http") || lower.Contains("www.") || lower.Contains(".com") || 
-                    lower.Contains("@") || lower.Contains("subscribe") || lower.Contains("patreon") || 
-                    lower.Contains("twitter") || lower.Contains("instagram") || lower.Contains("facebook") ||
-                    lower.Contains("tiktok") || lower.Contains("discount") || lower.Contains("promo code") ||
-                    lower.Contains("merch") || lower.Contains("sponsor") || lower.Contains("affiliate"))
+                // Skip any residual URL fragments or noise
+                if (lower.Contains("http") || lower.Contains("www.") || lower.Contains("com/") || 
+                    lower.Contains("/channel/") || lower.Contains("@") || lower.Contains("subscribe") || 
+                    lower.Contains("patreon") || lower.Contains("twitter") || lower.Contains("instagram") || 
+                    lower.Contains("facebook") || lower.Contains("tiktok") || lower.Contains("discount") || 
+                    lower.Contains("promo code") || lower.Contains("merch") || lower.Contains("sponsor") || 
+                    lower.Contains("affiliate"))
                 {
                     continue;
                 }
@@ -337,10 +348,10 @@ namespace VixzDesktop.Services
 
             if (cleanSentences.Count == 0)
             {
-                summary.Tldr = $"**{video.Title}** by **{video.ChannelTitle}** focuses on key reporting, commentary, and news analysis.";
-                summary.KeyTakeaways.Add($"Coverage of: {video.Title}");
-                summary.KeyTakeaways.Add($"Channel: {video.ChannelTitle}");
-                summary.KeyTakeaways.Add($"Upload details: {video.UploadDateText} • Duration: {video.DurationText}");
+                summary.Tldr = $"A video briefing titled **{video.Title}** presented by **{video.ChannelTitle}**.";
+                summary.KeyTakeaways.Add($"Detailed analysis and commentary on: {video.Title}");
+                summary.KeyTakeaways.Add($"Publisher: {video.ChannelTitle}");
+                summary.KeyTakeaways.Add($"Upload Info: {video.UploadDateText} • Duration: {video.DurationText}");
                 return;
             }
 
