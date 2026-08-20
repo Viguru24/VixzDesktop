@@ -780,16 +780,9 @@ namespace VixzDesktop
             {
                 var timeStr = await VideoWebView.ExecuteScriptAsync("getCurrentTime()");
                 double.TryParse(timeStr, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out curSec);
-                await VideoWebView.ExecuteScriptAsync("stopVideo();");
+                await VideoWebView.ExecuteScriptAsync("pauseVideo();");
             }
             catch { }
-
-            // Collapse main WebView and navigate to about:blank to guarantee ZERO background audio/video playback
-            VideoWebView.Visibility = Visibility.Collapsed;
-            if (VideoWebView.CoreWebView2 != null)
-            {
-                VideoWebView.CoreWebView2.Navigate("about:blank");
-            }
 
             _popOutWindow?.Close();
             _popOutWindow = new PopOutPlayerWindow(this, _currentVideo, curSec);
