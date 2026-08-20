@@ -56,7 +56,10 @@ namespace VixzDesktop.Services
     {
         private static readonly YoutubeClient _client = new YoutubeClient();
 
-        public static async Task<AiCommandResult> ProcessCommandAsync(string prompt, VideoItem? currentPlayingVideo)
+        public static async Task<AiCommandResult> ProcessCommandAsync(
+            string prompt, 
+            VideoItem? currentPlayingVideo, 
+            Func<string, Task<string>>? webViewTranscriptFetcher = null)
         {
             if (string.IsNullOrWhiteSpace(prompt))
             {
@@ -81,7 +84,7 @@ namespace VixzDesktop.Services
                     };
                 }
 
-                var sum = await GenerateSummaryAsync(currentPlayingVideo);
+                var sum = await GenerateSummaryAsync(currentPlayingVideo, webViewTranscriptFetcher);
 
                 return new AiCommandResult
                 {
@@ -219,7 +222,9 @@ namespace VixzDesktop.Services
             };
         }
 
-        public static async Task<VideoSummaryResult> GenerateSummaryAsync(VideoItem video)
+        public static async Task<VideoSummaryResult> GenerateSummaryAsync(
+            VideoItem video, 
+            Func<string, Task<string>>? webViewTranscriptFetcher = null)
         {
             var summary = new VideoSummaryResult
             {
@@ -230,52 +235,69 @@ namespace VixzDesktop.Services
 
             string rawTranscript = "";
 
-            try
+            // 1. Primary: Direct In-Browser Transcript via WebView2 (bypasses YouTube server-side IP blocks)
+            if (webViewTranscriptFetcher != null)
             {
-                var trackManifest = await _client.Videos.ClosedCaptions.GetManifestAsync(video.Id);
-
-                // Robust caption track selection (manual English, auto-generated "a.en", or any English track)
-                var trackInfo = trackManifest.Tracks.FirstOrDefault(t => t.Language.Code.Equals("en", StringComparison.OrdinalIgnoreCase)) ??
-                                trackManifest.Tracks.FirstOrDefault(t => t.Language.Code.Contains("en", StringComparison.OrdinalIgnoreCase)) ??
-                                trackManifest.Tracks.FirstOrDefault(t => t.Language.Name.Contains("English", StringComparison.OrdinalIgnoreCase)) ??
-                                trackManifest.Tracks.FirstOrDefault();
-
-                if (trackInfo != null)
+                try
                 {
-                    var track = await _client.Videos.ClosedCaptions.GetAsync(trackInfo);
-                    if (track != null && track.Captions.Count > 0)
+                    var webText = await webViewTranscriptFetcher(video.Id);
+                    if (!string.IsNullOrWhiteSpace(webText) && webText.Trim().Length > 50)
                     {
+                        rawTranscript = webText.Trim();
                         summary.HasTranscript = true;
-                        var sb = new StringBuilder();
-                        var chapterInterval = Math.Max(60.0, (track.Captions.Last().Offset.TotalSeconds) / 6.0);
-                        double nextChapterMark = 0;
-
-                        foreach (var cap in track.Captions)
-                        {
-                            var text = cap.Text?.Replace("\n", " ").Trim() ?? "";
-                            if (string.IsNullOrWhiteSpace(text)) continue;
-
-                            sb.Append(text).Append(" ");
-
-                            if (cap.Offset.TotalSeconds >= nextChapterMark && summary.Chapters.Count < 6)
-                            {
-                                var cleanSnippet = text.Length > 45 ? text.Substring(0, 42) + "..." : text;
-                                summary.Chapters.Add(new TimestampChapter
-                                {
-                                    Seconds = cap.Offset.TotalSeconds,
-                                    TimeFormatted = FormatTime(cap.Offset),
-                                    Title = cleanSnippet
-                                });
-                                nextChapterMark += chapterInterval;
-                            }
-                        }
-                        rawTranscript = sb.ToString();
                     }
                 }
+                catch { }
             }
-            catch { }
 
-            // Extract description / video info fallback if no closed captions
+            // 2. Secondary: YoutubeExplode Closed Captions API
+            if (string.IsNullOrWhiteSpace(rawTranscript))
+            {
+                try
+                {
+                    var trackManifest = await _client.Videos.ClosedCaptions.GetManifestAsync(video.Id);
+                    var trackInfo = trackManifest.Tracks.FirstOrDefault(t => t.Language.Code.Equals("en", StringComparison.OrdinalIgnoreCase)) ??
+                                    trackManifest.Tracks.FirstOrDefault(t => t.Language.Code.Contains("en", StringComparison.OrdinalIgnoreCase)) ??
+                                    trackManifest.Tracks.FirstOrDefault(t => t.Language.Name.Contains("English", StringComparison.OrdinalIgnoreCase)) ??
+                                    trackManifest.Tracks.FirstOrDefault();
+
+                    if (trackInfo != null)
+                    {
+                        var track = await _client.Videos.ClosedCaptions.GetAsync(trackInfo);
+                        if (track != null && track.Captions.Count > 0)
+                        {
+                            summary.HasTranscript = true;
+                            var sb = new StringBuilder();
+                            var chapterInterval = Math.Max(60.0, (track.Captions.Last().Offset.TotalSeconds) / 6.0);
+                            double nextChapterMark = 0;
+
+                            foreach (var cap in track.Captions)
+                            {
+                                var text = cap.Text?.Replace("\n", " ").Trim() ?? "";
+                                if (string.IsNullOrWhiteSpace(text)) continue;
+
+                                sb.Append(text).Append(" ");
+
+                                if (cap.Offset.TotalSeconds >= nextChapterMark && summary.Chapters.Count < 6)
+                                {
+                                    var cleanSnippet = text.Length > 45 ? text.Substring(0, 42) + "..." : text;
+                                    summary.Chapters.Add(new TimestampChapter
+                                    {
+                                        Seconds = cap.Offset.TotalSeconds,
+                                        TimeFormatted = FormatTime(cap.Offset),
+                                        Title = cleanSnippet
+                                    });
+                                    nextChapterMark += chapterInterval;
+                                }
+                            }
+                            rawTranscript = sb.ToString();
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            // 3. Fallback: Video description
             if (string.IsNullOrWhiteSpace(rawTranscript))
             {
                 try

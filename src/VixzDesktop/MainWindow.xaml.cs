@@ -256,6 +256,43 @@ namespace VixzDesktop
             if (!player || typeof player.getCurrentTime !== 'function') return 0;
             return player.getCurrentTime() || 0;
         }
+
+        async function fetchTranscript(vid) {
+            try {
+                var targetId = vid || currentVideoId;
+                if (!targetId) return '';
+                var res = await fetch('https://www.youtube.com/watch?v=' + targetId);
+                var html = await res.text();
+                var match = html.match(/""captionTracks"":\s*(\[.*?\])/);
+                if (!match) return '';
+
+                var tracks = JSON.parse(match[1]);
+                if (!tracks || tracks.length === 0) return '';
+
+                var enTrack = tracks.find(function(t) { return t.languageCode === 'en' || (t.vssId && t.vssId.indexOf('en') !== -1); }) || tracks[0];
+                if (!enTrack || !enTrack.baseUrl) return '';
+
+                var capRes = await fetch(enTrack.baseUrl + '&fmt=json3');
+                var capJson = await capRes.json();
+                if (!capJson.events) return '';
+
+                var fullText = '';
+                for (var i = 0; i < capJson.events.length; i++) {
+                    var ev = capJson.events[i];
+                    if (ev.segs) {
+                        for (var j = 0; j < ev.segs.length; j++) {
+                            var seg = ev.segs[j];
+                            if (seg.utf8) {
+                                fullText += seg.utf8 + ' ';
+                            }
+                        }
+                    }
+                }
+                return fullText.trim();
+            } catch (e) {
+                return '';
+            }
+        }
     </script>
 </body>
 </html>";
@@ -1468,8 +1505,23 @@ namespace VixzDesktop
 
             try
             {
-                // 3. Process via AiCopilotService
-                var result = await AiCopilotService.ProcessCommandAsync(prompt, _currentVideo);
+                // 3. Process via AiCopilotService with WebView2 transcript fetcher delegate
+                var result = await AiCopilotService.ProcessCommandAsync(prompt, _currentVideo, async (vid) =>
+                {
+                    try
+                    {
+                        if (VideoWebView.CoreWebView2 != null)
+                        {
+                            var rawJson = await VideoWebView.ExecuteScriptAsync($"fetchTranscript('{vid}')");
+                            if (!string.IsNullOrWhiteSpace(rawJson) && rawJson != "null" && rawJson != "\"\"")
+                            {
+                                return Newtonsoft.Json.JsonConvert.DeserializeObject<string>(rawJson) ?? "";
+                            }
+                        }
+                    }
+                    catch { }
+                    return "";
+                });
 
                 // Remove thinking indicator
                 AiMessageStack.Children.Remove(thinkingCard);
