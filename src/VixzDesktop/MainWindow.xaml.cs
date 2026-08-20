@@ -201,6 +201,14 @@ namespace VixzDesktop
             } catch(e) {}
         }, 1500);
 
+        function stopVideo() {
+            try {
+                if (player && typeof player.stopVideo === 'function') player.stopVideo();
+                if (player && typeof player.pauseVideo === 'function') player.pauseVideo();
+                if (player && typeof player.mute === 'function') player.mute();
+            } catch(e) {}
+        }
+
         function pauseVideo() {
             if (player && typeof player.pauseVideo === 'function') {
                 player.pauseVideo();
@@ -765,11 +773,12 @@ namespace VixzDesktop
             {
                 var timeStr = await VideoWebView.ExecuteScriptAsync("getCurrentTime()");
                 double.TryParse(timeStr, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out curSec);
-                await VideoWebView.ExecuteScriptAsync("pauseVideo()");
+                await VideoWebView.ExecuteScriptAsync("stopVideo();");
             }
             catch { }
 
-            // Unload main WebView to free 100% GPU/CPU resources & prevent dual playback lag
+            // Collapse main WebView and navigate to about:blank to guarantee ZERO background audio/video playback
+            VideoWebView.Visibility = Visibility.Collapsed;
             if (VideoWebView.CoreWebView2 != null)
             {
                 VideoWebView.CoreWebView2.Navigate("about:blank");
@@ -790,6 +799,7 @@ namespace VixzDesktop
         public void ReturnFromPopOut(VideoItem video, double positionSeconds)
         {
             _popOutWindow = null;
+            VideoWebView.Visibility = Visibility.Visible;
             SwitchToPlayerView();
             _ = PlayVideoAsync(video, positionSeconds);
             ShowToast($"⧉ Restored to main player at {TimeSpan.FromSeconds(positionSeconds):mm\\:ss}");
