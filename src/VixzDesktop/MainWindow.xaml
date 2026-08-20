@@ -51,14 +51,13 @@
 
                     <!-- App Logo & Brand -->
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Border Background="{StaticResource AccentRed}" Width="28" Height="28" CornerRadius="8">
-                            <TextBlock Text="▶" Foreground="White" FontSize="14" FontWeight="Bold" 
-                                       HorizontalAlignment="Center" VerticalAlignment="Center" Margin="2,0,0,0"/>
+                        <Border CornerRadius="8" ClipToBounds="True" Width="30" Height="30">
+                            <Image Source="App.png" Width="30" Height="30" RenderOptions.BitmapScalingMode="HighQuality"/>
                         </Border>
                         <TextBlock Text="Vixz" Foreground="White" FontSize="17" FontWeight="Bold" 
                                    VerticalAlignment="Center" Margin="10,0,0,0"/>
-                        <Border Background="#25FFFFFF" CornerRadius="6" Margin="8,0,0,0" Padding="6,2">
-                            <TextBlock Text="DESKTOP" Foreground="{StaticResource AccentGold}" FontSize="9" FontWeight="Bold"/>
+                        <Border Background="#25FF6B00" CornerRadius="6" Margin="8,0,0,0" Padding="6,2">
+                            <TextBlock Text="DESKTOP" Foreground="{StaticResource AccentOrange}" FontSize="9" FontWeight="Bold"/>
                         </Border>
                     </StackPanel>
 

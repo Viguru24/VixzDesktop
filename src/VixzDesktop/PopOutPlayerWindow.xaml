@@ -48,7 +48,9 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="⧉ " Foreground="{StaticResource AccentGold}" FontSize="13" FontWeight="Bold"/>
+                        <Border CornerRadius="4" ClipToBounds="True" Width="18" Height="18" Margin="0,0,6,0">
+                            <Image Source="App.png" Width="18" Height="18" RenderOptions.BitmapScalingMode="HighQuality"/>
+                        </Border>
                         <TextBlock x:Name="MiniVideoTitle" Text="Vixz Floating Player" Foreground="White" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxWidth="360"/>
                     </StackPanel>
 
