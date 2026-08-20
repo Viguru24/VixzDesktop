@@ -24,6 +24,7 @@ namespace VixzDesktop.Services
         public List<VideoItem> WatchLater { get; set; } = new List<VideoItem>();
         public List<VideoItem> WatchHistory { get; set; } = new List<VideoItem>();
         public List<string> SubscribedChannels { get; set; } = new List<string>();
+        public bool HasInitializedSubscriptions { get; set; } = false;
         public Dictionary<string, double> WatchPositions { get; set; } = new Dictionary<string, double>();
         public double Volume { get; set; } = 1.0;
         public string? GeminiApiKey { get; set; } = null;

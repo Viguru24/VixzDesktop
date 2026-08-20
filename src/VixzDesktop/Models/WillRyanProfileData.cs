@@ -116,19 +116,32 @@ namespace VixzDesktop.Models
         {
             get
             {
-                if (StorageService.Settings.SubscribedChannels == null || StorageService.Settings.SubscribedChannels.Count == 0)
+                if (StorageService.Settings.SubscribedChannels == null)
+                {
+                    StorageService.Settings.SubscribedChannels = new List<string>();
+                }
+
+                if (!StorageService.Settings.HasInitializedSubscriptions)
                 {
                     StorageService.Settings.SubscribedChannels = new List<string>(DefaultSubscribedChannels);
+                    StorageService.Settings.HasInitializedSubscriptions = true;
                     StorageService.Save();
                 }
                 return StorageService.Settings.SubscribedChannels;
             }
         }
 
+        public static bool IsSubscribed(string channelName)
+        {
+            if (string.IsNullOrWhiteSpace(channelName)) return false;
+            var trimmed = channelName.Trim();
+            return SubscribedChannels.Any(c => c.Equals(trimmed, StringComparison.OrdinalIgnoreCase));
+        }
+
         public static void AddSubscribedChannel(string name)
         {
             var trimmed = name.Trim();
-            if (!string.IsNullOrWhiteSpace(trimmed) && !SubscribedChannels.Any(c => c.Equals(trimmed, StringComparison.OrdinalIgnoreCase)))
+            if (!string.IsNullOrWhiteSpace(trimmed) && !IsSubscribed(trimmed))
             {
                 SubscribedChannels.Insert(0, trimmed);
                 StorageService.Save();
@@ -137,7 +150,21 @@ namespace VixzDesktop.Models
 
         public static void RemoveSubscribedChannel(string name)
         {
-            SubscribedChannels.RemoveAll(c => c.Equals(name.Trim(), StringComparison.OrdinalIgnoreCase));
+            var trimmed = name.Trim();
+            SubscribedChannels.RemoveAll(c => c.Equals(trimmed, StringComparison.OrdinalIgnoreCase));
+            StorageService.Save();
+        }
+
+        public static void ClearAllSubscribedChannels()
+        {
+            SubscribedChannels.Clear();
+            StorageService.Save();
+        }
+
+        public static void RestoreDefaultChannels()
+        {
+            SubscribedChannels.Clear();
+            SubscribedChannels.AddRange(DefaultSubscribedChannels);
             StorageService.Save();
         }
     }

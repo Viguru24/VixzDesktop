@@ -551,6 +551,317 @@ namespace VixzDesktop
             }
         }
 
+        private void RefreshSubscribedChannelsUi()
+        {
+            SubscribedChannelsList.ItemsSource = null;
+            SubscribedChannelsList.ItemsSource = WillRyanProfileData.SubscribedChannels;
+            SubscribersHeader.Text = $"👤 Subscriptions ({WillRyanProfileData.SubscribedChannels.Count})";
+            UpdateSubscribeToggleBtn();
+        }
+
+        private void DeleteChannel_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement elem && elem.Tag is string channelName)
+            {
+                WillRyanProfileData.RemoveSubscribedChannel(channelName);
+                RefreshSubscribedChannelsUi();
+                ShowToast($"Unsubscribed from {channelName}");
+            }
+        }
+
+        private void AddChannelBtn_Click(object sender, RoutedEventArgs e)
+        {
+            var prompt = new Window
+            {
+                Title = "➕ Add Subscribed Channel",
+                Width = 420,
+                Height = 220,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this,
+                Background = (System.Windows.Media.Brush)FindResource("BgDarkPrimary"),
+                Foreground = System.Windows.Media.Brushes.White,
+                WindowStyle = WindowStyle.ToolWindow,
+                ResizeMode = ResizeMode.NoResize
+            };
+
+            var sp = new StackPanel { Margin = new Thickness(18) };
+            var heading = new TextBlock
+            {
+                Text = "➕ Add Channel / Creator",
+                FontSize = 14,
+                FontWeight = FontWeights.Bold,
+                Foreground = (System.Windows.Media.Brush)FindResource("AccentGold"),
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            var desc = new TextBlock
+            {
+                Text = "Enter any YouTube channel name or handle to add to your custom subscriptions feed:",
+                FontSize = 11.5,
+                Foreground = (System.Windows.Media.Brush)FindResource("TextSecondary"),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 10)
+            };
+
+            var txtBox = new TextBox
+            {
+                Background = (System.Windows.Media.Brush)FindResource("BgDarkTertiary"),
+                Foreground = System.Windows.Media.Brushes.White,
+                BorderBrush = (System.Windows.Media.Brush)FindResource("BorderSubtle"),
+                FontSize = 12,
+                Padding = new Thickness(8, 6, 8, 6),
+                Margin = new Thickness(0, 0, 0, 14)
+            };
+
+            var btnRow = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+            var cancelBtn = new Button
+            {
+                Content = "Cancel",
+                Style = (Style)FindResource("GlassButton"),
+                Padding = new Thickness(12, 6, 12, 6),
+                Margin = new Thickness(0, 0, 8, 0)
+            };
+            cancelBtn.Click += (s, ev) => prompt.Close();
+
+            var addBtn = new Button
+            {
+                Content = "Add Channel",
+                Style = (Style)FindResource("GlassButton"),
+                Background = (System.Windows.Media.Brush)FindResource("AccentGold"),
+                Foreground = System.Windows.Media.Brushes.Black,
+                FontWeight = FontWeights.Bold,
+                Padding = new Thickness(14, 6, 14, 6)
+            };
+
+            Action doAdd = () =>
+            {
+                var val = txtBox.Text.Trim();
+                if (!string.IsNullOrWhiteSpace(val))
+                {
+                    WillRyanProfileData.AddSubscribedChannel(val);
+                    RefreshSubscribedChannelsUi();
+                    ShowToast($"Subscribed to {val}");
+                    prompt.Close();
+                }
+            };
+
+            addBtn.Click += (s, ev) => doAdd();
+            txtBox.KeyDown += (s, ev) =>
+            {
+                if (ev.Key == System.Windows.Input.Key.Enter) doAdd();
+            };
+
+            btnRow.Children.Add(cancelBtn);
+            btnRow.Children.Add(addBtn);
+
+            sp.Children.Add(heading);
+            sp.Children.Add(desc);
+            sp.Children.Add(txtBox);
+            sp.Children.Add(btnRow);
+
+            prompt.Content = sp;
+            txtBox.Focus();
+            prompt.ShowDialog();
+        }
+
+        private void ManageChannelsBtn_Click(object sender, RoutedEventArgs e)
+        {
+            var prompt = new Window
+            {
+                Title = "⚙️ Manage Subscriptions",
+                Width = 480,
+                Height = 440,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this,
+                Background = (System.Windows.Media.Brush)FindResource("BgDarkPrimary"),
+                Foreground = System.Windows.Media.Brushes.White,
+                WindowStyle = WindowStyle.ToolWindow,
+                ResizeMode = ResizeMode.NoResize
+            };
+
+            var grid = new Grid { Margin = new Thickness(18) };
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            var heading = new TextBlock
+            {
+                Text = "⚙️ Manage Your Subscribed Channels",
+                FontSize = 14,
+                FontWeight = FontWeights.Bold,
+                Foreground = (System.Windows.Media.Brush)FindResource("AccentGold"),
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            Grid.SetRow(heading, 0);
+
+            var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Margin = new Thickness(0, 0, 0, 12) };
+            var listStack = new StackPanel();
+
+            void PopulateList()
+            {
+                listStack.Children.Clear();
+                if (WillRyanProfileData.SubscribedChannels.Count == 0)
+                {
+                    listStack.Children.Add(new TextBlock
+                    {
+                        Text = "No subscribed channels yet. Click '➕' in the sidebar to add your favorites!",
+                        Foreground = (System.Windows.Media.Brush)FindResource("TextSecondary"),
+                        FontSize = 12,
+                        Margin = new Thickness(0, 30, 0, 0),
+                        HorizontalAlignment = HorizontalAlignment.Center
+                    });
+                    return;
+                }
+
+                foreach (var ch in WillRyanProfileData.SubscribedChannels.ToList())
+                {
+                    var row = new Grid { Margin = new Thickness(0, 2, 0, 2) };
+                    row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                    row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                    var chText = new TextBlock
+                    {
+                        Text = "▶ " + ch,
+                        Foreground = System.Windows.Media.Brushes.White,
+                        FontSize = 12,
+                        VerticalAlignment = VerticalAlignment.Center
+                    };
+                    Grid.SetColumn(chText, 0);
+
+                    var del = new Button
+                    {
+                        Content = "Remove ✕",
+                        Style = (Style)FindResource("GlassButton"),
+                        FontSize = 10,
+                        Padding = new Thickness(8, 3, 8, 3),
+                        Tag = ch
+                    };
+                    Grid.SetColumn(del, 1);
+                    del.Click += (s, ev) =>
+                    {
+                        if (s is FrameworkElement fe && fe.Tag is string c)
+                        {
+                            WillRyanProfileData.RemoveSubscribedChannel(c);
+                            RefreshSubscribedChannelsUi();
+                            PopulateList();
+                        }
+                    };
+
+                    row.Children.Add(chText);
+                    row.Children.Add(del);
+                    listStack.Children.Add(row);
+                }
+            }
+
+            PopulateList();
+            scroll.Content = listStack;
+            Grid.SetRow(scroll, 1);
+
+            var bottomBar = new Grid();
+            bottomBar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            bottomBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var leftBtns = new StackPanel { Orientation = Orientation.Horizontal };
+            var clearAllBtn = new Button
+            {
+                Content = "Clear All Channels",
+                Style = (Style)FindResource("GlassButton"),
+                Foreground = (System.Windows.Media.Brush)FindResource("AccentRed"),
+                FontSize = 11,
+                Padding = new Thickness(10, 6, 10, 6),
+                Margin = new Thickness(0, 0, 8, 0)
+            };
+            clearAllBtn.Click += (s, ev) =>
+            {
+                WillRyanProfileData.ClearAllSubscribedChannels();
+                RefreshSubscribedChannelsUi();
+                PopulateList();
+                ShowToast("Cleared all subscriptions");
+            };
+
+            var restoreBtn = new Button
+            {
+                Content = "Reset Defaults",
+                Style = (Style)FindResource("GlassButton"),
+                FontSize = 11,
+                Padding = new Thickness(10, 6, 10, 6)
+            };
+            restoreBtn.Click += (s, ev) =>
+            {
+                WillRyanProfileData.RestoreDefaultChannels();
+                RefreshSubscribedChannelsUi();
+                PopulateList();
+                ShowToast("Restored default channels");
+            };
+
+            leftBtns.Children.Add(clearAllBtn);
+            leftBtns.Children.Add(restoreBtn);
+            Grid.SetColumn(leftBtns, 0);
+
+            var closeBtn = new Button
+            {
+                Content = "Done",
+                Style = (Style)FindResource("GlassButton"),
+                Background = (System.Windows.Media.Brush)FindResource("AccentGold"),
+                Foreground = System.Windows.Media.Brushes.Black,
+                FontWeight = FontWeights.Bold,
+                FontSize = 11,
+                Padding = new Thickness(16, 6, 16, 6)
+            };
+            closeBtn.Click += (s, ev) => prompt.Close();
+            Grid.SetColumn(closeBtn, 1);
+
+            bottomBar.Children.Add(leftBtns);
+            bottomBar.Children.Add(closeBtn);
+            Grid.SetRow(bottomBar, 2);
+
+            grid.Children.Add(heading);
+            grid.Children.Add(scroll);
+            grid.Children.Add(bottomBar);
+
+            prompt.Content = grid;
+            prompt.ShowDialog();
+        }
+
+        private void SubscribeToggleBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentVideo == null || string.IsNullOrWhiteSpace(_currentVideo.ChannelTitle)) return;
+            var channel = _currentVideo.ChannelTitle.Trim();
+
+            if (WillRyanProfileData.IsSubscribed(channel))
+            {
+                WillRyanProfileData.RemoveSubscribedChannel(channel);
+                ShowToast($"Unsubscribed from {channel}");
+            }
+            else
+            {
+                WillRyanProfileData.AddSubscribedChannel(channel);
+                ShowToast($"Subscribed to {channel}!");
+            }
+            RefreshSubscribedChannelsUi();
+        }
+
+        private void UpdateSubscribeToggleBtn()
+        {
+            if (_currentVideo == null || string.IsNullOrWhiteSpace(_currentVideo.ChannelTitle))
+            {
+                SubscribeToggleBtn.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            SubscribeToggleBtn.Visibility = Visibility.Visible;
+            bool isSubbed = WillRyanProfileData.IsSubscribed(_currentVideo.ChannelTitle);
+            if (isSubbed)
+            {
+                SubscribeToggleBtn.Content = "✓ Subscribed";
+                SubscribeToggleBtn.Foreground = (System.Windows.Media.Brush)FindResource("AccentGold");
+            }
+            else
+            {
+                SubscribeToggleBtn.Content = "+ Subscribe";
+                SubscribeToggleBtn.Foreground = System.Windows.Media.Brushes.White;
+            }
+        }
+
         private async void NavTrending_Click(object sender, RoutedEventArgs e)
         {
             SwitchToFeedView();
@@ -711,6 +1022,7 @@ namespace VixzDesktop
             CurrentVideoChannel.Text = video.ChannelTitle;
             CurrentVideoDate.Text = !string.IsNullOrWhiteSpace(video.UploadDateText) ? $" • {video.UploadDateText}" : "";
             CurrentVideoViews.Text = !string.IsNullOrWhiteSpace(video.ViewCountText) ? $" • {video.ViewCountText}" : "";
+            UpdateSubscribeToggleBtn();
 
             // If date is missing, fetch full details asynchronously
             if (string.IsNullOrWhiteSpace(video.UploadDateText))

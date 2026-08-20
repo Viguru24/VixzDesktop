@@ -200,12 +200,25 @@
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"/>
                                 </Grid.RowDefinitions>
-                                <TextBlock x:Name="SubscribersHeader" Text="👤 Subscriptions" Foreground="{StaticResource TextSecondary}" FontSize="11" FontWeight="Bold" Margin="4,0,0,6"/>
+                                <Grid Grid.Row="0" Margin="4,0,4,6">
+                                    <TextBlock x:Name="SubscribersHeader" Text="👤 Subscriptions" Foreground="{StaticResource TextSecondary}" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <Button x:Name="AddChannelBtn" Content="➕" Style="{StaticResource IconActionButton}" Width="22" Height="22" FontSize="10" ToolTip="Add YouTube Channel / Creator" Click="AddChannelBtn_Click"/>
+                                        <Button x:Name="ManageChannelsBtn" Content="⚙️" Style="{StaticResource IconActionButton}" Width="22" Height="22" FontSize="10" Margin="2,0,0,0" ToolTip="Manage Subscriptions (Clear / Reset / Bulk Edit)" Click="ManageChannelsBtn_Click"/>
+                                    </StackPanel>
+                                </Grid>
                                 <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                                     <ItemsControl x:Name="SubscribedChannelsList">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
-                                                <Button Content="{Binding}" Style="{StaticResource GlassButton}" HorizontalContentAlignment="Left" FontSize="11" Padding="6,4" Margin="0,1" Click="ChannelFilter_Click"/>
+                                                <Grid Margin="0,1">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <Button Grid.Column="0" Content="{Binding}" Style="{StaticResource GlassButton}" HorizontalContentAlignment="Left" FontSize="11" Padding="6,4" Click="ChannelFilter_Click"/>
+                                                    <Button Grid.Column="1" Content="✕" Style="{StaticResource IconActionButton}" Width="20" Height="20" FontSize="9" Margin="2,0,0,0" ToolTip="Unsubscribe / Remove" Tag="{Binding}" Click="DeleteChannel_Click"/>
+                                                </Grid>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
@@ -432,10 +445,11 @@
 
                                     <StackPanel VerticalAlignment="Center">
                                         <TextBlock x:Name="CurrentVideoTitle" Text="Video Title" Foreground="White" FontSize="14" FontWeight="Bold" TextTrimming="CharacterEllipsis" MaxWidth="380"/>
-                                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                                            <TextBlock x:Name="CurrentVideoChannel" Text="Channel Name" Foreground="{StaticResource TextSecondary}" FontSize="11.5" FontWeight="SemiBold"/>
-                                            <TextBlock x:Name="CurrentVideoDate" Text="" Foreground="{StaticResource AccentGold}" FontSize="11.5" FontWeight="Bold" Margin="4,0,0,0"/>
-                                            <TextBlock x:Name="CurrentVideoViews" Text="" Foreground="{StaticResource TextSecondary}" FontSize="11" Margin="4,0,0,0"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0" VerticalAlignment="Center">
+                                            <TextBlock x:Name="CurrentVideoChannel" Text="Channel Name" Foreground="{StaticResource TextSecondary}" FontSize="11.5" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                            <Button x:Name="SubscribeToggleBtn" Content="+ Subscribe" Style="{StaticResource GlassButton}" FontSize="10" Padding="6,2" Margin="8,0,0,0" ToolTip="Toggle Subscription for this Creator" Click="SubscribeToggleBtn_Click"/>
+                                            <TextBlock x:Name="CurrentVideoDate" Text="" Foreground="{StaticResource AccentGold}" FontSize="11.5" FontWeight="Bold" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                                            <TextBlock x:Name="CurrentVideoViews" Text="" Foreground="{StaticResource TextSecondary}" FontSize="11" Margin="4,0,0,0" VerticalAlignment="Center"/>
                                         </StackPanel>
                                     </StackPanel>
                                 </StackPanel>
