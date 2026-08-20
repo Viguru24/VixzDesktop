@@ -1466,6 +1466,97 @@ namespace VixzDesktop
             }
         }
 
+        private void AiSettingsBtn_Click(object sender, RoutedEventArgs e)
+        {
+            var currentKey = StorageService.Settings.GeminiApiKey ?? "";
+            var prompt = new Window
+            {
+                Title = "⚙️ Vixz AI Brain Settings",
+                Width = 470,
+                Height = 280,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this,
+                Background = (System.Windows.Media.Brush)FindResource("BgDarkPrimary"),
+                Foreground = System.Windows.Media.Brushes.White,
+                WindowStyle = WindowStyle.ToolWindow,
+                ResizeMode = ResizeMode.NoResize
+            };
+
+            var sp = new StackPanel { Margin = new Thickness(18) };
+            var heading = new TextBlock
+            {
+                Text = "⚡ Connect Real AI (Gemini / Groq / OpenAI)",
+                FontSize = 14,
+                FontWeight = FontWeights.Bold,
+                Foreground = (System.Windows.Media.Brush)FindResource("AccentGold"),
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            var desc = new TextBlock
+            {
+                Text = "Paste your free API key from Google AI Studio (Gemini 2.0 / 1.5 Flash), Groq, or OpenAI to enable full conversational ChatGPT-level intelligence and video reasoning:",
+                FontSize = 11.5,
+                Foreground = (System.Windows.Media.Brush)FindResource("TextSecondary"),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 12)
+            };
+
+            var txtBox = new TextBox
+            {
+                Text = currentKey,
+                Background = (System.Windows.Media.Brush)FindResource("BgDarkTertiary"),
+                Foreground = System.Windows.Media.Brushes.White,
+                BorderBrush = (System.Windows.Media.Brush)FindResource("BorderSubtle"),
+                FontSize = 12,
+                Padding = new Thickness(8, 6, 8, 6),
+                Margin = new Thickness(0, 0, 0, 14)
+            };
+
+            var btnRow = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+            var clearBtn = new Button
+            {
+                Content = "Clear Key",
+                Style = (Style)FindResource("GlassButton"),
+                Padding = new Thickness(12, 6, 12, 6),
+                Margin = new Thickness(0, 0, 8, 0)
+            };
+            clearBtn.Click += (s, ev) =>
+            {
+                StorageService.Settings.GeminiApiKey = null;
+                StorageService.Save();
+                ShowToast("Cleared AI API Key");
+                prompt.Close();
+            };
+
+            var saveBtn = new Button
+            {
+                Content = "Save & Activate",
+                Style = (Style)FindResource("GlassButton"),
+                Background = (System.Windows.Media.Brush)FindResource("AccentGold"),
+                Foreground = System.Windows.Media.Brushes.Black,
+                FontWeight = FontWeights.Bold,
+                Padding = new Thickness(14, 6, 14, 6)
+            };
+            saveBtn.Click += (s, ev) =>
+            {
+                var val = txtBox.Text.Trim();
+                StorageService.Settings.GeminiApiKey = string.IsNullOrWhiteSpace(val) ? null : val;
+                StorageService.Save();
+                ShowToast("✨ AI Brain Connected Successfully!");
+                prompt.Close();
+            };
+
+            btnRow.Children.Add(clearBtn);
+            btnRow.Children.Add(saveBtn);
+
+            sp.Children.Add(heading);
+            sp.Children.Add(desc);
+            sp.Children.Add(txtBox);
+            sp.Children.Add(btnRow);
+
+            prompt.Content = sp;
+            prompt.ShowDialog();
+        }
+
         private void AiChipSummarize_Click(object sender, RoutedEventArgs e)
         {
             _ = SubmitAiCommandAsync("Summarise this video");

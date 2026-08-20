@@ -617,7 +617,10 @@
                                     <TextBlock Text="VOICE &amp; COMMANDS" Foreground="{StaticResource AccentGold}" FontSize="9" FontWeight="Bold"/>
                                 </Border>
                             </StackPanel>
-                            <Button Content="✕" Style="{StaticResource IconActionButton}" Width="26" Height="26" HorizontalAlignment="Right" Click="CloseAiCopilot_Click"/>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button x:Name="AiSettingsBtn" Content="⚙️" Style="{StaticResource IconActionButton}" Width="26" Height="26" Margin="0,0,4,0" ToolTip="AI Brain Settings (Connect Free Gemini / Groq / OpenAI Key)" Click="AiSettingsBtn_Click"/>
+                                <Button Content="✕" Style="{StaticResource IconActionButton}" Width="26" Height="26" Click="CloseAiCopilot_Click"/>
+                            </StackPanel>
                         </Grid>
 
                         <!-- Quick Action Suggestion Chips -->
