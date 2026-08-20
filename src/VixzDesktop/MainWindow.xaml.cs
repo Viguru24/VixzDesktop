@@ -1438,16 +1438,30 @@ namespace VixzDesktop
             ToggleAiCopilotDrawer();
         }
 
+        private double _savedAiDrawerWidth = 390;
+
         private void CloseAiCopilot_Click(object sender, RoutedEventArgs e)
         {
+            if (AiDrawerCol.ActualWidth > 200)
+            {
+                _savedAiDrawerWidth = AiDrawerCol.ActualWidth;
+            }
             AiCopilotPanel.Visibility = Visibility.Collapsed;
+            AiGridSplitter.Visibility = Visibility.Collapsed;
+            AiDrawerCol.Width = new GridLength(0);
         }
 
         private void ToggleAiCopilotDrawer()
         {
-            AiCopilotPanel.Visibility = AiCopilotPanel.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
             if (AiCopilotPanel.Visibility == Visibility.Visible)
             {
+                CloseAiCopilot_Click(null!, null!);
+            }
+            else
+            {
+                AiCopilotPanel.Visibility = Visibility.Visible;
+                AiGridSplitter.Visibility = Visibility.Visible;
+                AiDrawerCol.Width = new GridLength(Math.Max(320, _savedAiDrawerWidth));
                 AiPromptBox.Focus();
             }
         }
@@ -1493,6 +1507,8 @@ namespace VixzDesktop
             if (AiCopilotPanel.Visibility != Visibility.Visible)
             {
                 AiCopilotPanel.Visibility = Visibility.Visible;
+                AiGridSplitter.Visibility = Visibility.Visible;
+                AiDrawerCol.Width = new GridLength(Math.Max(320, _savedAiDrawerWidth));
             }
 
             AiPromptBox.Text = "";
@@ -1731,12 +1747,32 @@ namespace VixzDesktop
 
                     foreach (var point in sum.KeyTakeaways)
                     {
-                        var pointRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 2, 0, 2) };
-                        var dot = new TextBlock { Text = "• ", Foreground = (System.Windows.Media.Brush)FindResource("AccentGold"), FontSize = 12 };
-                        var pointText = new TextBlock { Text = point, Foreground = System.Windows.Media.Brushes.White, FontSize = 11.5, TextWrapping = TextWrapping.Wrap, MaxWidth = 310 };
-                        pointRow.Children.Add(dot);
-                        pointRow.Children.Add(pointText);
-                        cardStack.Children.Add(pointRow);
+                        var pointGrid = new Grid { Margin = new Thickness(0, 3, 0, 3) };
+                        pointGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                        pointGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+                        var dot = new TextBlock 
+                        { 
+                            Text = "• ", 
+                            Foreground = (System.Windows.Media.Brush)FindResource("AccentGold"), 
+                            FontSize = 12,
+                            Margin = new Thickness(0, 0, 4, 0)
+                        };
+                        Grid.SetColumn(dot, 0);
+
+                        var pointText = new TextBlock 
+                        { 
+                            Text = point, 
+                            Foreground = System.Windows.Media.Brushes.White, 
+                            FontSize = 11.5, 
+                            LineHeight = 16.5,
+                            TextWrapping = TextWrapping.Wrap 
+                        };
+                        Grid.SetColumn(pointText, 1);
+
+                        pointGrid.Children.Add(dot);
+                        pointGrid.Children.Add(pointText);
+                        cardStack.Children.Add(pointGrid);
                     }
                 }
 

@@ -395,7 +395,6 @@ namespace VixzDesktop.Services
                 {
                     int index = Math.Min(cleanSentences.Count - 1, (int)(i * step));
                     var pt = cleanSentences[index];
-                    if (pt.Length > 130) pt = pt.Substring(0, 127) + "...";
                     if (!keyPoints.Contains(pt)) keyPoints.Add(pt);
                 }
             }
