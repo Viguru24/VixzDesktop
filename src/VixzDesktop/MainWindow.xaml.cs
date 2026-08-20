@@ -114,12 +114,13 @@ namespace VixzDesktop
                 },
                 events: {
                     'onReady': function(e) {
+                        try { e.target.unMute(); } catch(err) {}
                         if (startSec > 3) {
                             try { e.target.seekTo(startSec, true); } catch(err) {}
                         }
                         try { e.target.playVideo(); } catch(err) {}
-                        setTimeout(function() { try { e.target.playVideo(); } catch(err) {} }, 250);
-                        setTimeout(function() { try { if (e.target.getPlayerState() !== 1) e.target.playVideo(); } catch(err) {} }, 750);
+                        setTimeout(function() { try { e.target.unMute(); e.target.playVideo(); } catch(err) {} }, 250);
+                        setTimeout(function() { try { e.target.unMute(); if (e.target.getPlayerState() !== 1) e.target.playVideo(); } catch(err) {} }, 750);
                     },
                     'onStateChange': onPlayerStateChange
                 }
@@ -205,7 +206,12 @@ namespace VixzDesktop
             try {
                 if (player && typeof player.stopVideo === 'function') player.stopVideo();
                 if (player && typeof player.pauseVideo === 'function') player.pauseVideo();
-                if (player && typeof player.mute === 'function') player.mute();
+            } catch(e) {}
+        }
+
+        function unMuteVideo() {
+            try {
+                if (player && typeof player.unMute === 'function') player.unMute();
             } catch(e) {}
         }
 
@@ -217,6 +223,7 @@ namespace VixzDesktop
 
         function playVideo() {
             if (player && typeof player.playVideo === 'function') {
+                try { player.unMute(); } catch(e) {}
                 player.playVideo();
             }
         }
