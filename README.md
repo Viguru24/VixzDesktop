@@ -110,3 +110,18 @@ Looking for the Android version? Check out **[Vixz YouTube Player for Android](h
 <div align="center">
   <sub>Distributed under the MIT License • Built with ❤️ by <a href="https://github.com/Viguru24">Viguru24</a></sub>
 </div>
+
+---
+
+<!-- VIGURU24-ECOSYSTEM-START -->
+## 🌟 The Viguru24 Ecosystem
+
+Explore the full suite of local-first applications by **[Viguru24](https://github.com/Viguru24)** ([Showcase Portal](https://viguru24.github.io)):
+- 🌌 **[Cosmo Symphony](https://github.com/Viguru24/Video)** — GPU-accelerated video & photo orchestrator, AI 4K/8K upscaler & local Wi-Fi phone-to-PC sharing for Windows.
+- 🎙️ **[CosmoWhisper](https://github.com/Viguru24/CosmoWhisper-Native)** — High-performance, 100% local AI voice dictation & transcription for Windows & macOS.
+- 🎬 **[Vixz YouTube Player (Android)](https://github.com/Viguru24/YouTube)** — Ad-free YouTube player with SponsorBlock, AI summaries, offline downloads & fluid gestures.
+- 🛰️ **[Kin-Tracker](https://github.com/Viguru24/Kin-Tracker)** — Private, 24/7 real-time family safety radar & GPS transit network for Android.
+- 📖 **[Cosmo Compendium](https://github.com/Viguru24/cosmo-compendium)** — Smart tactile journal for recipes, craft formulas, and maker notes with AI scanning & Cook Mode.
+- 🗣️ **[FluencyAI](https://github.com/Viguru24/FluencyAI)** — AI-powered English language tutoring PWA with interactive roleplay & voice immersion.
+- 🚀 **[MultiGravity Pro](https://github.com/Viguru24/multigravity-pro)** — Run multiple Antigravity IDE profiles simultaneously with isolated accounts & settings.
+<!-- VIGURU24-ECOSYSTEM-END -->
