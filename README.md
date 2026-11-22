@@ -10,7 +10,7 @@
 [![Download MSIX](https://img.shields.io/badge/📥%20Download%20MSIX-v1.0.0-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/Viguru24/VixzDesktop/releases/download/v1.0.0/VixzDesktop-v1.0.0.msix)
 [![GitHub Release](https://img.shields.io/github/v/release/Viguru24/VixzDesktop?style=for-the-badge&color=2ea44f)](https://github.com/Viguru24/VixzDesktop/releases/latest)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011%20(x64)-0078D6?style=for-the-badge&logo=windows)](https://github.com/Viguru24/VixzDesktop)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
+[![License](https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge)](LICENSE)
 [![Companion App](https://img.shields.io/badge/Android%20App-Vixz%20Player-3DDC84?style=for-the-badge&logo=android)](https://github.com/Viguru24/YouTube)
 
 <p align="center">
@@ -108,7 +108,7 @@ Looking for the Android version? Check out **[Vixz YouTube Player for Android](h
 ---
 
 <div align="center">
-  <sub>Distributed under the MIT License • Built with ❤️ by <a href="https://github.com/Viguru24">Viguru24</a></sub>
+  <sub>Distributed under the GNU GPL v3.0 License • Built with ❤️ by <a href="https://github.com/Viguru24">Viguru24</a></sub>
 </div>
 
 ---
